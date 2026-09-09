@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block title %}Match Toss - {{ match.match_name }}{% endblock %}
+
+{% block content %}
+<div x-data="tossManager()" class="max-w-xl mx-auto space-y-5">
+
+  <div class="text-center space-y-1">
+    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+      Coin Toss & Openers
+    </span>
+    <h1 class="text-2xl font-black text-white">{{ match.match_name }}</h1>
+    <p class="text-xs text-slate-400">{{ match.team_a_name }} vs {{ match.team_b_name }} · {{ match.overs_per_innings }} Overs</p>
+  </div>
+
+  <form @submit.prevent="submitToss()" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5 text-xs">
+    
+    <!-- 1. Who won the toss? -->
+    <div class="space-y-2">
+      <label class="block text-slate-200 font-bold text-sm">1. Who won the toss?</label>
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" @click="tossWinner = '{{ match.team_a_name }}'"
+          :class="tossWinner === '{{ match.team_a_name }}' ? 'bg-emerald-500 text-slate-950 font-black border-emerald-400' : 'bg-slate-950 text-slate-300 border-slate-800'"
+          class="p-3 rounded-xl border text-center transition-all text-sm">
+          🏏 {{ match.team_a_name }}
+        </button>
+
+        <button type="button" @click="tossWinner = '{{ match.team_b_name }}'"
+          :class="tossWinner === '{{ match.team_b_name }}' ? 'bg-emerald-500 text-slate-950 font-black border-emerald-400' : 'bg-slate-950 text-slate-300 border-slate-800'"
+          class="p-3 rounded-xl border text-center transition-all text-sm">
+          🏏 {{ match.team_b_name }}
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. Elected to? -->
+    <div class="space-y-2" x-show="tossWinner">
+      <label class="block text-slate-200 font-bold text-sm">2. Elected to?</label>
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" @click="tossDecision = 'bat'"
+          :class="tossDecision === 'bat' ? 'bg-emerald-500 text-slate-950 font-black border-emerald-400' : 'bg-slate-950 text-slate-300 border-slate-800'"
+          class="p-3 rounded-xl border text-center transition-all text-sm">
+          🏏 Bat First
+        </button>
+
+        <button type="button" @click="tossDecision = 'bowl'"
+          :class="tossDecision === 'bowl' ? 'bg-emerald-500 text-slate-950 font-black border-emerald-400' : 'bg-slate-950 text-slate-300 border-slate-800'"
+          class="p-3 rounded-xl border text-center transition-all text-sm">
+          ⚾ Bowl First
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. Dynamic Summary Badge -->
+    <div x-show="tossWinner && tossDecision" class="bg-emerald-950/40 border border-emerald-900/50 rounded-xl p-3 text-center text-emerald-300 font-medium">
+      <span class="font-bold text-white" x-text="tossWinner"></span> won the toss and elected to <span class="font-bold text-emerald-400" x-text="tossDecision"></span> first.
+      <div class="mt-1 text-[11px] text-slate-400">
+        Batting: <span class="text-white font-semibold" x-text="battingTeam"></span> | 
+        Bowling: <span class="text-white font-semibold" x-text="bowlingTeam"></span>
+      </div>
+    </div>
+
+    <!-- 4. Extras & Free Run Rules Confirmation -->
+    <div x-show="tossWinner && tossDecision" class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <span class="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+          <span>⚙️</span>
+          <span>Extras & Free Run Rules</span>
+        </span>
+        <span class="text-[10px] text-emerald-400 font-semibold">Street / Gully Customization</span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <!-- Wide Ball Free Run -->
+        <div class="space-y-1 bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+          <label class="block text-slate-300 font-semibold text-[11px]">Free Run on Wide Ball?</label>
+          <select x-model.number="settings.wide_runs" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white text-xs">
+            <option :value="1">1 Run (Standard Cricket)</option>
+            <option :value="0">0 Runs (Gully: Re-ball only, no free run)</option>
+            <option :value="2">2 Runs (2-run penalty)</option>
+          </select>
+          <p class="text-[10px] text-slate-500" x-text="settings.wide_runs == 0 ? 'Batting team gets 0 runs for wide; bowler must re-bowl.' : 'Batting team gets ' + settings.wide_runs + ' penalty run(s) + re-bowl.'"></p>
+        </div>
+
+        <!-- No-Ball Free Run -->
+        <div class="space-y-1 bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+          <label class="block text-slate-300 font-semibold text-[11px]">Free Run on No-Ball?</label>
+          <select x-model.number="settings.no_ball_runs" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white text-xs">
+            <option :value="1">1 Run (Standard Cricket)</option>
+            <option :value="0">0 Runs (Gully: Re-ball only, only bat runs count)</option>
+            <option :value="2">2 Runs (2-run penalty)</option>
+          </select>
+          <p class="text-[10px] text-slate-500" x-text="settings.no_ball_runs == 0 ? 'Batting team gets 0 penalty runs; only runs off bat count.' : 'Batting team gets ' + settings.no_ball_runs + ' penalty run(s) + bat runs.'"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Select Openers -->
+    <div x-show="tossWinner && tossDecision" class="space-y-4 pt-2 border-t border-slate-800">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-sm text-slate-200">Select Opening Pair & Bowler</h3>
+        <span class="text-[11px] text-slate-400">Tap a player or choose from dropdown</span>
+      </div>
+
+      <!-- Striker -->
+      <div class="space-y-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+        <div class="flex items-center justify-between">
+          <label class="block text-slate-200 font-semibold text-xs flex items-center gap-1.5">
+            <span>🏏 Striker Batsman</span>
+            <span class="text-emerald-400 font-normal" x-text="'(' + battingTeam + ')'"></span>
+          </label>
+          <span x-show="striker" class="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-500/30">
+            Selected
+          </span>
+        </div>
+
+        <!-- Tap-to-select pills for Striker -->
+        <div class="flex flex-wrap gap-1.5">
+          <template x-for="p in battingPlayers" :key="p.id">
+            <button type="button" @click="striker = p.id" :disabled="p.id == nonStriker"
+              class="px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all active:scale-95 flex items-center gap-1"
+              :class="striker == p.id 
+                ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30' 
+                : (p.id == nonStriker ? 'bg-slate-900/50 text-slate-600 border-slate-800 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-850 text-slate-300 border-slate-800')">
+              <span x-text="p.name"></span>
+              <span x-show="striker == p.id" class="text-[10px]">✓</span>
+              <span x-show="p.id == nonStriker" class="text-[9px] text-slate-500">(Non-Striker)</span>
+            </button>
+          </template>
+        </div>
+
+        <select x-model="striker" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white text-xs focus:border-emerald-500 focus:outline-none" required>
+          <option value="">-- Or Choose Striker Dropdown --</option>
+          <template x-for="p in battingPlayers" :key="p.id">
+            <option :value="p.id" x-text="p.name" :disabled="p.id == nonStriker"></option>
+          </template>
+        </select>
+      </div>
+
+      <!-- Non-striker -->
+      <div class="space-y-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+        <div class="flex items-center justify-between">
+          <label class="block text-slate-200 font-semibold text-xs flex items-center gap-1.5">
+            <span>🏏 Non-Striker Batsman</span>
+            <span class="text-emerald-400 font-normal" x-text="'(' + battingTeam + ')'"></span>
+          </label>
+          <span x-show="nonStriker" class="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-500/30">
+            Selected
+          </span>
+        </div>
+
+        <!-- Tap-to-select pills for Non-Striker -->
+        <div class="flex flex-wrap gap-1.5">
+          <template x-for="p in battingPlayers" :key="p.id">
+            <button type="button" @click="nonStriker = p.id" :disabled="p.id == striker"
+              class="px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all active:scale-95 flex items-center gap-1"
+              :class="nonStriker == p.id 
+                ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/30' 
+                : (p.id == striker ? 'bg-slate-900/50 text-slate-600 border-slate-800 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-850 text-slate-300 border-slate-800')">
+              <span x-text="p.name"></span>
+              <span x-show="nonStriker == p.id" class="text-[10px]">✓</span>
+              <span x-show="p.id == striker" class="text-[9px] text-slate-500">(Striker)</span>
+            </button>
+          </template>
+        </div>
+
+        <select x-model="nonStriker" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white text-xs focus:border-emerald-500 focus:outline-none" required>
+          <option value="">-- Or Choose Non-Striker Dropdown --</option>
+          <template x-for="p in battingPlayers" :key="p.id">
+            <option :value="p.id" x-text="p.name" :disabled="p.id == striker"></option>
+          </template>
+        </select>
+      </div>
+
+      <!-- Opening Bowler -->
+      <div class="space-y-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+        <div class="flex items-center justify-between">
+          <label class="block text-slate-200 font-semibold text-xs flex items-center gap-1.5">
+            <span>⚾ Opening Bowler</span>
+            <span class="text-blue-400 font-normal" x-text="'(' + bowlingTeam + ')'"></span>
+          </label>
+          <span x-show="bowler" class="text-[10px] text-blue-400 font-bold bg-blue-950/60 px-2 py-0.5 rounded-full border border-blue-500/30">
+            Selected
+          </span>
+        </div>
+
+        <!-- Tap-to-select pills for Opening Bowler -->
+        <div class="flex flex-wrap gap-1.5">
+          <template x-for="p in bowlingPlayers" :key="p.id">
+            <button type="button" @click="bowler = p.id"
+              class="px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all active:scale-95 flex items-center gap-1"
+              :class="bowler == p.id 
+                ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-600/30' 
+                : 'bg-slate-900 hover:bg-slate-850 text-slate-300 border-slate-800'">
+              <span x-text="p.name"></span>
+              <span x-show="bowler == p.id" class="text-[10px]">✓</span>
+            </button>
+          </template>
+        </div>
+
+        <select x-model="bowler" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white text-xs focus:border-emerald-500 focus:outline-none" required>
+          <option value="">-- Or Choose Opening Bowler Dropdown --</option>
+          <template x-for="p in bowlingPlayers" :key="p.id">
+            <option :value="p.id" x-text="p.name"></option>
+          </template>
+        </select>
+      </div>
+    </div>
+
+    <!-- Start Scoring Button -->
+    <div x-show="tossWinner && tossDecision" class="pt-2">
+      <button type="submit" :disabled="loading || !striker || !nonStriker || !bowler"
+        class="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black text-sm shadow-lg shadow-emerald-500/20 transition-all active:scale-95">
+        <span x-show="!loading">🚀 Start Match Scoring</span>
+        <span x-show="loading">Setting up match...</span>
+      </button>
+    </div>
+
+  </form>
+
+</div>
+
+<script>
+function tossManager() {
+  const teamAPlayers = {{ team_a_players | tojson if team_a_players else '[]' }};
+  const teamBPlayers = {{ team_b_players | tojson if team_b_players else '[]' }};
+  const teamAName = "{{ match.team_a_name }}";
+  const teamBName = "{{ match.team_b_name }}";
+
+  return {
+    tossWinner: '',
+    tossDecision: '',
+    striker: '',
+    nonStriker: '',
+    bowler: '',
+    loading: false,
+
+    settings: {
+      wide_runs: {{ settings.wide_runs if settings else 1 }},
+      no_ball_runs: {{ settings.no_ball_runs if settings else 1 }},
+      wide_reball: {{ 'true' if (not settings or settings.wide_reball) else 'false' }},
+      no_ball_reball: {{ 'true' if (not settings or settings.no_ball_reball) else 'false' }},
+      last_man_standing: {{ 'true' if (settings and settings.last_man_standing) else 'false' }},
+      free_hit_on_no_ball: {{ 'true' if (settings and settings.free_hit_on_no_ball) else 'false' }},
+    },
+
+    get battingTeam() {
+      if (!this.tossWinner || !this.tossDecision) return '';
+      if (this.tossDecision === 'bat') return this.tossWinner;
+      return this.tossWinner === teamAName ? teamBName : teamAName;
+    },
+
+    get bowlingTeam() {
+      if (!this.tossWinner || !this.tossDecision) return '';
+      if (this.tossDecision === 'bowl') return this.tossWinner;
+      return this.tossWinner === teamAName ? teamBName : teamAName;
+    },
+
+    get battingPlayers() {
+      return this.battingTeam === teamAName ? teamAPlayers : teamBPlayers;
+    },
+
+    get bowlingPlayers() {
+      return this.bowlingTeam === teamAName ? teamAPlayers : teamBPlayers;
+    },
+
+    async submitToss() {
+      this.loading = true;
+      try {
+        const payload = {
+          toss_winner_team: this.tossWinner,
+          toss_decision: this.tossDecision,
+          striker_name_or_id: String(this.striker),
+          non_striker_name_or_id: String(this.nonStriker),
+          bowler_name_or_id: String(this.bowler),
+          settings: this.settings,
+        };
+
+        const res = await fetch('/api/matches/{{ match.id }}/toss', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+        window.location.href = '/match/{{ match.id }}/score';
+      } catch (err) {
+        alert('Toss error: ' + err.message);
+      } finally {
+        this.loading = false;
+      }
+    }
+  }
+}
+</script>
+{% endblock %}

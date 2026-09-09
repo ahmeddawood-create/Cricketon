@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block title %}Scorecard - {{ match.match_name }}{% endblock %}
+
+{% block content %}
+<div x-data="scorecardView({{ match.id }})" x-init="init()" class="space-y-6 max-w-3xl mx-auto">
+
+  <!-- Scorecard Header -->
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
+          Match Scorecard
+        </span>
+        <span class="text-xs text-slate-400" x-text="data ? data.status.toUpperCase() : ''"></span>
+      </div>
+      <h1 class="text-2xl font-black text-white" x-text="data ? data.match_name : '{{ match.match_name }}'"></h1>
+      <p class="text-xs text-slate-400" x-text="(data ? data.overs_per_innings : '{{ match.overs_per_innings }}') + ' Overs · ' + (data ? (data.venue || 'Local Ground') : '')"></p>
+      
+      <template x-if="data && data.result">
+        <div class="mt-2 text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+          🏆 <span x-text="data.result"></span>
+        </div>
+      </template>
+    </div>
+
+    <!-- Quick Action Buttons -->
+    <div class="flex items-center gap-2">
+      <a :href="'/match/' + matchId + '/score'" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs">
+        Scorer Keypad &rarr;
+      </a>
+      <button @click="scrollToWhatsAppCard()" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20">
+        <span>📲 WhatsApp Card</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- INNINGS SCORECARDS -->
+  <template x-if="data && data.innings">
+    <div class="space-y-6">
+      <template x-for="inn in data.innings" :key="inn.innings_id">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+          
+          <!-- Innings Subheader -->
+          <div class="bg-slate-950/70 px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                Innings <span x-text="inn.innings_number"></span>
+              </span>
+              <h2 class="font-black text-white text-base" x-text="inn.batting_team"></h2>
+            </div>
+
+            <div class="text-right">
+              <span class="text-xl font-black text-white" x-text="inn.total_runs + '/' + inn.total_wickets"></span>
+              <span class="text-xs text-slate-400 ml-1">(<span x-text="inn.overs_str"></span> ov)</span>
+            </div>
+          </div>
+
+          <!-- Batting Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-950/40 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                <tr>
+                  <th class="py-2.5 px-4">Batsman</th>
+                  <th class="py-2.5 px-2">Dismissal</th>
+                  <th class="py-2.5 px-2 text-right">R</th>
+                  <th class="py-2.5 px-2 text-right">B</th>
+                  <th class="py-2.5 px-2 text-right">4s</th>
+                  <th class="py-2.5 px-2 text-right">6s</th>
+                  <th class="py-2.5 px-4 text-right">SR</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60 font-mono text-slate-200">
+                <template x-for="b in inn.batsmen" :key="b.player_id">
+                  <tr class="hover:bg-slate-800/30">
+                    <td class="py-2.5 px-4 font-sans font-bold text-white flex items-center gap-1.5">
+                      <span x-text="b.player_name"></span>
+                      <span x-show="b.is_striker" class="text-emerald-400 text-xs">*</span>
+                    </td>
+                    <td class="py-2.5 px-2 font-sans text-slate-400 text-[11px]" x-text="b.dismissal_text"></td>
+                    <td class="py-2.5 px-2 text-right font-bold text-white" x-text="b.runs"></td>
+                    <td class="py-2.5 px-2 text-right text-slate-400" x-text="b.balls"></td>
+                    <td class="py-2.5 px-2 text-right text-slate-400" x-text="b.fours"></td>
+                    <td class="py-2.5 px-2 text-right text-slate-400" x-text="b.sixes"></td>
+                    <td class="py-2.5 px-4 text-right text-slate-300" x-text="b.strike_rate"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Extras & Total Bar -->
+          <div class="bg-slate-950/50 px-5 py-2.5 border-t border-b border-slate-800/80 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
+            <div>
+              <span>Extras: </span>
+              <strong class="text-white" x-text="inn.extras.total"></strong>
+              <span class="text-[11px] text-slate-500">
+                (wd <span x-text="inn.extras.wides"></span>, nb <span x-text="inn.extras.no_balls"></span>, b <span x-text="inn.extras.byes"></span>, lb <span x-text="inn.extras.leg_byes"></span>)
+              </span>
+            </div>
+            <div>
+              <span>Total: </span>
+              <strong class="text-white font-mono text-sm" x-text="inn.total_runs + '/' + inn.total_wickets"></strong>
+              <span class="text-[11px] text-slate-500">(<span x-text="inn.overs_str"></span> Overs, RR: <span x-text="inn.run_rate"></span>)</span>
+            </div>
+          </div>
+
+          <!-- Bowling Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-950/40 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                <tr>
+                  <th class="py-2 px-4">Bowler</th>
+                  <th class="py-2 px-2 text-right">O</th>
+                  <th class="py-2 px-2 text-right">M</th>
+                  <th class="py-2 px-2 text-right">R</th>
+                  <th class="py-2 px-2 text-right">W</th>
+                  <th class="py-2 px-4 text-right">Econ</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60 font-mono text-slate-200">
+                <template x-for="bw in inn.bowlers" :key="bw.player_id">
+                  <tr class="hover:bg-slate-800/30">
+                    <td class="py-2 px-4 font-sans font-medium text-white" x-text="bw.player_name"></td>
+                    <td class="py-2 px-2 text-right text-slate-300" x-text="bw.overs_str"></td>
+                    <td class="py-2 px-2 text-right text-slate-400" x-text="bw.maidens"></td>
+                    <td class="py-2 px-2 text-right text-slate-300" x-text="bw.runs_conceded"></td>
+                    <td class="py-2 px-2 text-right font-bold text-emerald-400" x-text="bw.wickets"></td>
+                    <td class="py-2 px-4 text-right text-slate-300" x-text="bw.economy"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Fall of Wickets -->
+          <template x-if="inn.fall_of_wickets && inn.fall_of_wickets.length > 0">
+            <div class="bg-slate-950/30 px-5 py-2.5 border-t border-slate-800 text-[11px] text-slate-400">
+              <span class="font-bold text-slate-300">Fall of Wickets: </span>
+              <template x-for="(fow, idx) in inn.fall_of_wickets" :key="idx">
+                <span class="inline-block mr-2">
+                  <span class="font-mono text-white" x-text="fow.score + '-' + fow.wicket_number"></span>
+                  (<span x-text="fow.player_name"></span>, <span x-text="fow.overs_str"></span> ov)<span x-show="idx < inn.fall_of_wickets.length - 1">,</span>
+                </span>
+              </template>
+            </div>
+          </template>
+
+        </div>
+      </template>
+    </div>
+  </template>
+
+  <!-- ================= WHATSAPP SHAREABLE GRAPHIC CARD ================= -->
+  <div id="whatsapp-section" class="space-y-3 pt-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <span>📲 WhatsApp Shareable Scorecard</span>
+        </h3>
+        <p class="text-xs text-slate-400">Export high-resolution scorecard graphic directly for your cricket group chat</p>
+      </div>
+
+      <button @click="downloadWhatsAppImage()" :disabled="generatingImage" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
+        <span x-show="!generatingImage">📸 Download Card Image</span>
+        <span x-show="generatingImage">Generating...</span>
+      </button>
+    </div>
+
+    <!-- The Styled Card Container to be Captured via html2canvas -->
+    <div id="whatsapp-card" class="bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 border-2 border-emerald-600/40 rounded-3xl p-6 shadow-2xl space-y-5 text-white max-w-lg mx-auto">
+      
+      <!-- Top Branding -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🏏</span>
+          <div>
+            <h4 class="font-black text-base text-white">MyCric<span class="text-emerald-400">Scorer</span></h4>
+            <span class="text-[10px] text-slate-400 uppercase tracking-widest font-mono">Gully Match Summary</span>
+          </div>
+        </div>
+
+        <span class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+          x-text="(data ? data.overs_per_innings : 6) + ' Overs Match'"></span>
+      </div>
+
+      <!-- Match Winner Banner -->
+      <div class="bg-emerald-950/60 border border-emerald-500/30 rounded-2xl p-4 text-center space-y-1">
+        <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Result</span>
+        <h3 class="text-xl font-black text-white" x-text="data && data.result ? data.result : 'Match In Progress'"></h3>
+        <p class="text-xs text-slate-400" x-text="data ? data.match_name : ''"></p>
+      </div>
+
+      <!-- Innings Summaries -->
+      <div class="grid grid-cols-2 gap-3">
+        <template x-for="inn in (data ? data.innings : [])" :key="inn.innings_id">
+          <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-center space-y-1">
+            <span class="text-[11px] font-bold text-slate-400 uppercase" x-text="inn.batting_team"></span>
+            <div class="text-2xl font-black text-white" x-text="inn.total_runs + '/' + inn.total_wickets"></div>
+            <span class="text-[11px] text-slate-400 font-mono" x-text="'(' + inn.overs_str + ' ov)'"></span>
+          </div>
+        </template>
+      </div>
+
+      <!-- Top Batting & Bowling Highlights -->
+      <div class="space-y-2 pt-1">
+        <h5 class="text-xs font-bold uppercase tracking-wider text-slate-400">Top Performers</h5>
+        
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <!-- Top Batting -->
+          <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 space-y-1">
+            <span class="text-[10px] text-emerald-400 font-bold uppercase">Top Batters</span>
+            <template x-for="b in getTopBatsmen()" :key="b.player_id">
+              <div class="flex items-center justify-between text-[11px] text-slate-300">
+                <span class="truncate max-w-[90px]" x-text="b.player_name"></span>
+                <span class="font-bold text-white font-mono" x-text="b.runs + '(' + b.balls + ')'"></span>
+              </div>
+            </template>
+          </div>
+
+          <!-- Top Bowling -->
+          <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 space-y-1">
+            <span class="text-[10px] text-emerald-400 font-bold uppercase">Top Bowlers</span>
+            <template x-for="bw in getTopBowlers()" :key="bw.player_id">
+              <div class="flex items-center justify-between text-[11px] text-slate-300">
+                <span class="truncate max-w-[90px]" x-text="bw.player_name"></span>
+                <span class="font-bold text-emerald-400 font-mono" x-text="bw.wickets + '/' + bw.runs_conceded"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Note -->
+      <div class="text-[10px] text-slate-500 text-center pt-2 border-t border-slate-800/80">
+        Scored with MyCricScorer · Weekend & Street Cricket Engine
+      </div>
+    </div>
+
+    <!-- Match Actions / Danger Zone -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
+      <div class="flex items-center justify-between">
+        <div>
+          <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span>⚙️ Match Actions & Danger Zone</span>
+          </h4>
+          <p class="text-[11px] text-slate-400">Restart this match from the beginning or delete it entirely</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 pt-1">
+        <button type="button" @click="resetMatch()"
+          class="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all">
+          <span>🔄 Reset Match to Start</span>
+        </button>
+        <button type="button" @click="deleteMatch()"
+          class="flex-1 py-2.5 px-3 rounded-xl bg-red-950/50 hover:bg-red-900/80 border border-red-800/40 text-red-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all">
+          <span>🗑️ Delete Match Permanently</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+function scorecardView(matchId) {
+  return {
+    matchId: matchId,
+    data: null,
+    generatingImage: false,
+
+    async init() {
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}/scorecard`);
+        if (res.ok) {
+          this.data = await res.json();
+        }
+      } catch (err) {
+        console.error('Failed to load scorecard', err);
+      }
+    },
+
+    scrollToWhatsAppCard() {
+      document.getElementById('whatsapp-section').scrollIntoView({ behavior: 'smooth' });
+    },
+
+    getTopBatsmen() {
+      if (!this.data || !this.data.innings) return [];
+      const allBatsmen = [];
+      this.data.innings.forEach(inn => {
+        allBatsmen.push(...inn.batsmen);
+      });
+      return allBatsmen.sort((a, b) => b.runs - a.runs).slice(0, 3);
+    },
+
+    getTopBowlers() {
+      if (!this.data || !this.data.innings) return [];
+      const allBowlers = [];
+      this.data.innings.forEach(inn => {
+        allBowlers.push(...inn.bowlers);
+      });
+      return allBowlers.sort((a, b) => (b.wickets * 100 - b.runs_conceded) - (a.wickets * 100 - a.runs_conceded)).slice(0, 3);
+    },
+
+    async downloadWhatsAppImage() {
+      this.generatingImage = true;
+      try {
+        const cardElem = document.getElementById('whatsapp-card');
+        const canvas = await html2canvas(cardElem, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#020617'
+        });
+        const imgData = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `Scorecard_Match_${this.matchId}.png`;
+        link.href = imgData;
+        link.click();
+      } catch (err) {
+        alert('Could not export scorecard image: ' + err.message);
+      } finally {
+        this.generatingImage = false;
+      }
+    },
+
+    async resetMatch() {
+      if (!confirm('Are you sure you want to reset this match back to the start?\nAll ball deliveries and wickets will be cleared, while team rosters and settings remain.')) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}/reset`, { method: 'POST' });
+        if (!res.ok) throw new Error(await res.text());
+        window.location.href = `/match/${this.matchId}/toss`;
+      } catch (err) {
+        alert('Failed to reset match: ' + err.message);
+      }
+    },
+
+    async deleteMatch() {
+      if (!confirm('Are you sure you want to permanently delete this match?\nAll scorecards, overs, and ball-by-ball logs will be completely erased.')) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(await res.text());
+        alert('Match deleted successfully');
+        window.location.href = '/';
+      } catch (err) {
+        alert('Failed to delete match: ' + err.message);
+      }
+    }
+  }
+}
+</script>
+{% endblock %}

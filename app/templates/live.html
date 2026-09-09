@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Live Score - {{ match.match_name }}{% endblock %}
+
+{% block content %}
+<div x-data="liveSpectator({{ match.id }})" x-init="startLive()" class="max-w-md mx-auto space-y-4 select-none">
+  
+  <!-- Live Match Card -->
+  <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4">
+    
+    <!-- Top Live Tag -->
+    <div class="flex items-center justify-between text-xs border-b border-slate-800/80 pb-3">
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 font-bold border border-red-500/20 text-[11px]">
+          <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+          LIVE SPECTATOR
+        </span>
+        <span class="text-slate-400 font-medium" x-text="'Inn ' + (data && data.innings ? data.innings.innings_number : '1')"></span>
+      </div>
+
+      <a :href="'/match/' + matchId + '/scorecard'" class="text-xs text-slate-400 hover:text-emerald-400">
+        Scorecard &rarr;
+      </a>
+    </div>
+
+    <!-- Match Header & Score -->
+    <div>
+      <h1 class="text-base font-bold text-white mb-1" x-text="data ? data.match_name : '{{ match.match_name }}'"></h1>
+      
+      <div class="flex items-baseline justify-between pt-1">
+        <div>
+          <span class="text-5xl font-black tracking-tight text-white" x-text="data && data.innings ? data.innings.total_runs + '/' + data.innings.total_wickets : '0/0'"></span>
+          <span class="text-lg text-slate-400 font-medium ml-1">
+            (<span x-text="data && data.innings ? data.innings.overs_str : '0.0'"></span> ov)
+          </span>
+        </div>
+
+        <div class="text-right font-mono">
+          <div class="text-xs text-slate-400">CRR: <strong class="text-white" x-text="data && data.innings ? data.innings.run_rate : '0.0'"></strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chase Situation Banner (if 2nd Innings) -->
+    <template x-if="data && data.innings && data.innings.target_runs">
+      <div class="bg-amber-950/40 border border-amber-900/40 rounded-xl p-2.5 text-xs text-amber-300 flex items-center justify-between">
+        <span>Target: <strong x-text="data.innings.target_runs"></strong> (<span x-text="data.innings.runs_needed"></span> off <span x-text="data.innings.balls_remaining"></span>b)</span>
+        <span>Req: <strong x-text="data.innings.required_run_rate"></strong></span>
+      </div>
+    </template>
+
+    <!-- Result Banner -->
+    <template x-if="data && data.result">
+      <div class="bg-emerald-950/50 border border-emerald-500/30 rounded-xl p-3 text-center text-emerald-400 font-bold text-sm">
+        🏆 <span x-text="data.result"></span>
+      </div>
+    </template>
+
+    <!-- Recent Balls Ribbon -->
+    <div class="space-y-1.5 pt-1">
+      <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">This Over</div>
+      <div class="flex items-center gap-2 overflow-x-auto py-1">
+        <template x-for="(badge, idx) in (data && data.innings ? data.innings.recent_balls : [])" :key="idx">
+          <span class="w-8 h-8 rounded-lg flex items-center justify-center font-black font-mono text-xs shadow-sm"
+            :class="{
+              'bg-slate-800 text-slate-400': badge === '•' || badge === '0',
+              'bg-emerald-600/30 text-emerald-400 border border-emerald-500/40': badge === '1' || badge === '2' || badge === '3',
+              'bg-blue-600 text-white': badge === '4',
+              'bg-purple-600 text-white': badge === '6',
+              'bg-amber-600/30 text-amber-400 border border-amber-500/40': badge.includes('Wd') || badge.includes('Nb'),
+              'bg-red-600 text-white': badge.startsWith('W')
+            }"
+            x-text="badge"></span>
+        </template>
+      </div>
+    </div>
+
+    <!-- Active Batsmen List -->
+    <div class="space-y-2 pt-2 border-t border-slate-800 text-xs">
+      <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Batsmen at Crease</div>
+      <template x-for="b in (data && data.innings ? data.innings.batsmen.filter(x => x.is_batting) : [])" :key="b.player_id">
+        <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
+          <div class="flex items-center gap-2">
+            <span x-show="b.is_striker" class="text-emerald-400 font-black">🏏*</span>
+            <span class="font-bold text-white" x-text="b.player_name"></span>
+          </div>
+          <div class="font-mono text-slate-300">
+            <strong class="text-white text-sm" x-text="b.runs"></strong>
+            <span class="text-slate-500">(<span x-text="b.balls"></span>)</span>
+            <span class="text-slate-500 text-[10px] ml-1">SR:<span x-text="b.strike_rate"></span></span>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Active Bowler -->
+    <template x-if="data && data.innings && data.innings.bowlers.find(x => x.is_bowling)">
+      <div class="space-y-1.5 pt-1 text-xs">
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Current Bowler</div>
+        <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
+          <span class="font-bold text-white" x-text="data.innings.bowlers.find(x => x.is_bowling).player_name"></span>
+          <div class="font-mono text-slate-300">
+            <span x-text="data.innings.bowlers.find(x => x.is_bowling).overs_str"></span>-<span x-text="data.innings.bowlers.find(x => x.is_bowling).maidens"></span>-<span x-text="data.innings.bowlers.find(x => x.is_bowling).runs_conceded"></span>-<strong class="text-emerald-400" x-text="data.innings.bowlers.find(x => x.is_bowling).wickets"></strong>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Auto-update pulse footnote -->
+    <div class="text-[10px] text-slate-500 text-center pt-2 flex items-center justify-center gap-1.5">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+      <span>Auto-refreshing live score every 3s</span>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+function liveSpectator(matchId) {
+  return {
+    matchId: matchId,
+    data: null,
+    timer: null,
+
+    async fetchLive() {
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}/live-summary`);
+        if (res.ok) {
+          this.data = await res.json();
+        }
+      } catch (err) {
+        console.error('Live polling error', err);
+      }
+    },
+
+    startLive() {
+      this.fetchLive();
+      this.timer = setInterval(() => this.fetchLive(), 3000);
+    }
+  }
+}
+</script>
+{% endblock %}

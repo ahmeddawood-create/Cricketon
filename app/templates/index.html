@@ -1,0 +1,668 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - MyCricScorer{% endblock %}
+
+{% block content %}
+<div x-data="matchDashboard()" class="space-y-6">
+  
+  <!-- Top Hero Banner & Quick Action -->
+  <div class="bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 border border-emerald-900/40 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+    <div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
+          ⚡ Gully & Weekend Edition
+        </span>
+        <h1 class="text-2xl font-black tracking-tight text-white">Street Cricket Scorer</h1>
+        <p class="text-sm text-slate-400 mt-1 max-w-md">Fast 1-thumb scoring, instant undo, gully rule toggles, and WhatsApp scorecard export.</p>
+      </div>
+
+      <button @click="openCreateModal = true" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/25 transition-all active:scale-95">
+        <span>+ Start New Match</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Matches Section -->
+  <div class="space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div>
+        <h2 class="text-lg font-bold tracking-tight text-slate-200">Recent & Live Matches</h2>
+        <span class="text-xs text-slate-400">{{ matches|length }} matches stored</span>
+      </div>
+      {% if matches %}
+      <div class="flex items-center gap-2">
+        <button type="button" @click="cleanupCompletedMatches()"
+          class="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-semibold flex items-center gap-1 transition-all"
+          title="Delete all finished matches">
+          <span>🧹 Clear Completed Matches</span>
+        </button>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if matches %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {% for m in matches %}
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm hover:border-slate-700 transition-all flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between text-xs mb-2">
+            <span class="text-slate-400">{{ m.created_at.strftime('%d %b %Y, %I:%M %p') }}</span>
+            <span class="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider
+              {% if m.status == 'in_progress' %}bg-amber-500/10 text-amber-400 border border-amber-500/20
+              {% elif m.status == 'completed' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
+              {% elif m.status == 'innings_break' %}bg-purple-500/10 text-purple-400 border border-purple-500/20
+              {% else %}bg-slate-800 text-slate-300{% endif %}">
+              {{ m.status.replace('_', ' ') }}
+            </span>
+          </div>
+
+          <h3 class="font-bold text-white text-base">{{ m.match_name }}</h3>
+          <p class="text-xs text-slate-400">{{ m.overs_per_innings }} Overs · {{ m.players_per_side }} Players/side · {{ m.venue or 'Local Ground' }}</p>
+
+          <div class="mt-3 bg-slate-950/60 rounded-lg p-2.5 border border-slate-800/80 flex items-center justify-between text-sm">
+            <span class="font-semibold text-slate-200">{{ m.team_a_name }}</span>
+            <span class="text-xs text-slate-500 font-mono">VS</span>
+            <span class="font-semibold text-slate-200">{{ m.team_b_name }}</span>
+          </div>
+
+          {% if m.winner_team %}
+          <div class="mt-2 text-xs font-semibold text-emerald-400 flex items-center gap-1">
+            🏆 {{ m.winner_team }} {{ m.win_margin }}
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-800/60 flex items-center gap-2">
+          {% if m.status == 'created' %}
+          <a href="/match/{{ m.id }}/toss" class="flex-1 text-center py-2 rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400">
+            Conduct Toss
+          </a>
+          {% elif m.status in ['in_progress', 'innings_break'] %}
+          <a href="/match/{{ m.id }}/score" class="flex-1 text-center py-2 rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400">
+            Resume Scoring
+          </a>
+          <a href="/match/{{ m.id }}/live" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold">
+            Live View
+          </a>
+          <button type="button" @click="resetMatch({{ m.id }}, '{{ m.match_name }}')"
+            class="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-semibold"
+            title="Reset match back to initial toss state">
+            🔄
+          </button>
+          {% else %}
+          <a href="/match/{{ m.id }}/scorecard" class="flex-1 text-center py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs">
+            Full Scorecard
+          </a>
+          <a href="/match/{{ m.id }}/scorecard#whatsapp" class="px-3 py-2 rounded-lg bg-emerald-950 hover:bg-emerald-900 text-emerald-400 text-xs font-semibold border border-emerald-800/50 flex items-center gap-1">
+            <span>Share</span>
+          </a>
+          {% endif %}
+          <button type="button" @click="deleteMatch({{ m.id }}, '{{ m.match_name }}')"
+            class="px-2.5 py-2 rounded-lg bg-red-950/40 hover:bg-red-900/60 border border-red-800/40 text-red-400 hover:text-red-200 text-xs font-semibold transition-all"
+            title="Delete this match permanently">
+            🗑️
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-10 text-center">
+      <div class="text-4xl mb-3">🏏</div>
+      <h3 class="text-base font-bold text-white">No matches scored yet</h3>
+      <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Set up your first match in 30 seconds with custom gully rules and player rosters.</p>
+      <button @click="openCreateModal = true" class="mt-4 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs">
+        + Create First Match
+      </button>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Create Match Modal Wizard -->
+  <div x-show="openCreateModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3">
+    <div @click.away="openCreateModal = false" class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-5 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <span>🏏 Setup New Match & Squads</span>
+          </h3>
+          <p class="text-xs text-slate-400">Configure teams, select players from saved pool or add new players</p>
+        </div>
+        <button @click="openCreateModal = false" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+      </div>
+
+      <form @submit.prevent="createMatch()" class="space-y-4 text-xs">
+        <!-- Match info -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Match Name</label>
+            <input type="text" x-model="form.match_name" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none" required>
+          </div>
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Venue / Ground</label>
+            <input type="text" x-model="form.venue" placeholder="e.g. Cross Road Ground" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none">
+          </div>
+        </div>
+
+        <!-- Overs & Players Per Side -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Overs Per Innings</label>
+            <input type="number" x-model.number="form.overs_per_innings" min="1" max="50" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none" required>
+          </div>
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Players Per Side</label>
+            <input type="number" x-model.number="form.players_per_side" min="2" max="20" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none" required>
+          </div>
+        </div>
+
+        <!-- SAVED PLAYERS QUICK-DRAFT POOL -->
+        <div x-show="savedPlayers && savedPlayers.length > 0" class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 space-y-2">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <span class="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+              <span>⭐ Saved Players Quick-Pick</span>
+              <span class="text-[10px] text-slate-400 font-normal" x-text="'(' + savedPlayers.length + ' registered)'"></span>
+            </span>
+            <input type="text" x-model="savedPlayerSearch" placeholder="🔍 Search saved players..."
+              class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+          </div>
+
+          <div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-1">
+            <template x-for="p in filteredSavedPlayers" :key="p.id">
+              <div class="flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] transition-all"
+                :class="isPlayerInTeam(p.name, 'team_a') ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' :
+                        (isPlayerInTeam(p.name, 'team_b') ? 'bg-blue-950/40 border-blue-500/40 text-blue-300' : 'bg-slate-900 border-slate-800 text-slate-300')">
+                <span class="font-medium" x-text="p.name"></span>
+                <template x-if="!isPlayerInTeam(p.name, 'team_a') && !isPlayerInTeam(p.name, 'team_b')">
+                  <div class="flex items-center gap-1 ml-1">
+                    <button type="button" @click="addPlayerToTeam('team_a', p.name)"
+                      class="px-1.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[9px]" title="Add to Team A">
+                      +A
+                    </button>
+                    <button type="button" @click="addPlayerToTeam('team_b', p.name)"
+                      class="px-1.5 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[9px]" title="Add to Team B">
+                      +B
+                    </button>
+                  </div>
+                </template>
+                <template x-if="isPlayerInTeam(p.name, 'team_a')">
+                  <span class="text-[9px] font-bold text-emerald-400 ml-1">(A)</span>
+                </template>
+                <template x-if="isPlayerInTeam(p.name, 'team_b')">
+                  <span class="text-[9px] font-bold text-blue-400 ml-1">(B)</span>
+                </template>
+                <button type="button" @click.stop="deleteSavedPlayer(p.id, p.name)"
+                  class="ml-1 text-slate-500 hover:text-red-400 text-xs px-0.5 leading-none hover:bg-slate-850 rounded" title="Delete player from database">
+                  &times;
+                </button>
+              </div>
+            </template>
+            <div x-show="filteredSavedPlayers.length === 0" class="text-slate-500 text-[11px] italic py-1">
+              No matching saved players found.
+            </div>
+          </div>
+        </div>
+
+        <!-- SQUAD BUILDERS: TEAM A & TEAM B -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+          
+          <!-- TEAM A SQUAD CARD -->
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 flex-1">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                <input type="text" x-model="form.team_a_name" placeholder="Team A Name"
+                  class="bg-transparent border-b border-slate-700 focus:border-emerald-400 text-white font-bold text-sm w-full outline-none py-0.5" required>
+              </div>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border"
+                :class="form.team_a_players.length >= form.players_per_side ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'"
+                x-text="form.team_a_players.length + '/' + form.players_per_side + ' Players'">
+              </span>
+            </div>
+
+            <!-- Quick Add Input for Team A -->
+            <div class="flex gap-1.5">
+              <input type="text" x-model="newPlayerA" @keydown.enter.prevent="addPlayerToTeam('team_a', newPlayerA)"
+                placeholder="Type player name & hit enter..."
+                class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+              <button type="button" @click="addPlayerToTeam('team_a', newPlayerA)"
+                class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs">
+                + Add
+              </button>
+            </div>
+
+            <!-- Squad Controls -->
+            <div class="flex items-center justify-between text-[11px] text-slate-400 px-0.5">
+              <button type="button" @click="openBulkPaste('team_a')" class="hover:text-emerald-400 flex items-center gap-1">
+                <span>📋 Paste WhatsApp List</span>
+              </button>
+              <button type="button" @click="clearTeam('team_a')" class="hover:text-red-400">
+                Clear
+              </button>
+            </div>
+
+            <!-- Team A Player Chips -->
+            <div class="space-y-1 max-h-44 overflow-y-auto pr-1">
+              <template x-for="(name, idx) in form.team_a_players" :key="idx">
+                <div class="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-800/80 text-xs">
+                  <div class="flex items-center gap-2">
+                    <span class="w-5 text-[10px] font-bold text-slate-500" x-text="'#' + (idx + 1)"></span>
+                    <span class="font-semibold text-slate-200" x-text="name"></span>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button type="button" @click="movePlayer('team_a', idx)"
+                      class="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white"
+                      title="Move to Team B">
+                      ⇄ Team B
+                    </button>
+                    <button type="button" @click="removePlayer('team_a', idx)"
+                      class="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-slate-800 text-sm leading-none"
+                      title="Remove player">
+                      &times;
+                    </button>
+                  </div>
+                </div>
+              </template>
+              <div x-show="form.team_a_players.length === 0" class="text-slate-500 text-[11px] italic text-center py-4">
+                No players added to Team A yet.
+              </div>
+            </div>
+          </div>
+
+          <!-- TEAM B SQUAD CARD -->
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 flex-1">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span>
+                <input type="text" x-model="form.team_b_name" placeholder="Team B Name"
+                  class="bg-transparent border-b border-slate-700 focus:border-blue-400 text-white font-bold text-sm w-full outline-none py-0.5" required>
+              </div>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border"
+                :class="form.team_b_players.length >= form.players_per_side ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'"
+                x-text="form.team_b_players.length + '/' + form.players_per_side + ' Players'">
+              </span>
+            </div>
+
+            <!-- Quick Add Input for Team B -->
+            <div class="flex gap-1.5">
+              <input type="text" x-model="newPlayerB" @keydown.enter.prevent="addPlayerToTeam('team_b', newPlayerB)"
+                placeholder="Type player name & hit enter..."
+                class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
+              <button type="button" @click="addPlayerToTeam('team_b', newPlayerB)"
+                class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs">
+                + Add
+              </button>
+            </div>
+
+            <!-- Squad Controls -->
+            <div class="flex items-center justify-between text-[11px] text-slate-400 px-0.5">
+              <button type="button" @click="openBulkPaste('team_b')" class="hover:text-blue-400 flex items-center gap-1">
+                <span>📋 Paste WhatsApp List</span>
+              </button>
+              <button type="button" @click="clearTeam('team_b')" class="hover:text-red-400">
+                Clear
+              </button>
+            </div>
+
+            <!-- Team B Player Chips -->
+            <div class="space-y-1 max-h-44 overflow-y-auto pr-1">
+              <template x-for="(name, idx) in form.team_b_players" :key="idx">
+                <div class="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-800/80 text-xs">
+                  <div class="flex items-center gap-2">
+                    <span class="w-5 text-[10px] font-bold text-slate-500" x-text="'#' + (idx + 1)"></span>
+                    <span class="font-semibold text-slate-200" x-text="name"></span>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button type="button" @click="movePlayer('team_b', idx)"
+                      class="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white"
+                      title="Move to Team A">
+                      ⇄ Team A
+                    </button>
+                    <button type="button" @click="removePlayer('team_b', idx)"
+                      class="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-slate-800 text-sm leading-none"
+                      title="Remove player">
+                      &times;
+                    </button>
+                  </div>
+                </div>
+              </template>
+              <div x-show="form.team_b_players.length === 0" class="text-slate-500 text-[11px] italic text-center py-4">
+                No players added to Team B yet.
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Quick Demo Teams button -->
+        <div class="flex items-center justify-between text-slate-400 text-[11px] px-1">
+          <span>Need quick teams for a rapid weekend match?</span>
+          <button type="button" @click="loadDemoSquads()" class="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1">
+            <span>⚡ Load Sample Pro Squads</span>
+          </button>
+        </div>
+
+        <!-- Gully Cricket Rules Accordion -->
+        <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-200">🏏 Gully / Street Rules</span>
+            <span class="text-[11px] text-emerald-400">Custom rules</span>
+          </div>
+
+          <!-- Free runs on extras configuration -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div class="space-y-1 bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+              <label class="block text-slate-300 font-semibold text-[11px]">Free Run on Wide Ball?</label>
+              <select x-model.number="form.settings.wide_runs" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-[11px]">
+                <option :value="1">1 Run (Standard)</option>
+                <option :value="0">0 Runs (No free run - Re-ball only)</option>
+                <option :value="2">2 Runs (Street 2-run penalty)</option>
+              </select>
+            </div>
+
+            <div class="space-y-1 bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+              <label class="block text-slate-300 font-semibold text-[11px]">Free Run on No-Ball?</label>
+              <select x-model.number="form.settings.no_ball_runs" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-[11px]">
+                <option :value="1">1 Run (Standard)</option>
+                <option :value="0">0 Runs (No free run - Re-ball only)</option>
+                <option :value="2">2 Runs (Street 2-run penalty)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-1 text-slate-300">
+            <label class="flex items-center gap-2 cursor-pointer bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+              <input type="checkbox" x-model="form.settings.last_man_standing" class="rounded bg-slate-950 border-slate-700 text-emerald-500 focus:ring-0">
+              <span>Last Man Standing</span>
+            </label>
+
+            <label class="flex items-center gap-2 cursor-pointer bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+              <input type="checkbox" x-model="form.settings.wide_reball" class="rounded bg-slate-950 border-slate-700 text-emerald-500 focus:ring-0">
+              <span>Re-ball on Wide</span>
+            </label>
+
+            <label class="flex items-center gap-2 cursor-pointer bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+              <input type="checkbox" x-model="form.settings.no_ball_reball" class="rounded bg-slate-950 border-slate-700 text-emerald-500 focus:ring-0">
+              <span>Re-ball on No-Ball</span>
+            </label>
+
+            <label class="flex items-center gap-2 cursor-pointer bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+              <input type="checkbox" x-model="form.settings.free_hit_on_no_ball" class="rounded bg-slate-950 border-slate-700 text-emerald-500 focus:ring-0">
+              <span>Free Hit on No-Ball</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" @click="openCreateModal = false" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold">
+            Cancel
+          </button>
+          <button type="submit" :disabled="loading" class="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold flex items-center gap-2">
+            <span x-show="!loading">Create & Proceed to Toss &rarr;</span>
+            <span x-show="loading">Creating...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- BULK PASTE MODAL (WhatsApp List Import) -->
+  <div x-show="showBulkPasteModal" x-cloak class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-3 text-xs">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h3 class="font-bold text-white text-sm">
+          📋 Paste Player List for <span class="text-emerald-400" x-text="bulkPasteTarget === 'team_a' ? form.team_a_name : form.team_b_name"></span>
+        </h3>
+        <button type="button" @click="showBulkPasteModal = false" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <p class="text-[11px] text-slate-400">
+        Paste names copied from WhatsApp, Notes, or text (separated by commas or each on a new line):
+      </p>
+
+      <textarea x-model="bulkPasteText" rows="6" placeholder="Rohit&#10;Virat&#10;Bumrah&#10;Hardik"
+        class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white focus:border-emerald-500 focus:outline-none text-xs font-mono"></textarea>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+        <button type="button" @click="showBulkPasteModal = false" class="px-3.5 py-1.5 rounded-lg bg-slate-800 text-slate-300">
+          Cancel
+        </button>
+        <button type="button" @click="applyBulkPaste()" class="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold">
+          Import Players
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function matchDashboard() {
+  const registeredPlayers = [
+    {% for p in players %}
+    { id: {{ p.id }}, name: "{{ p.name }}" },
+    {% endfor %}
+  ];
+
+  return {
+    openCreateModal: false,
+    loading: false,
+    savedPlayers: registeredPlayers,
+    savedPlayerSearch: '',
+    newPlayerA: '',
+    newPlayerB: '',
+
+    showBulkPasteModal: false,
+    bulkPasteTarget: 'team_a',
+    bulkPasteText: '',
+
+    form: {
+      match_name: 'Weekend Gully Match',
+      venue: 'Street Ground',
+      overs_per_innings: 6,
+      players_per_side: 8,
+      team_a_name: 'Street Strikers',
+      team_b_name: 'Alley Blasters',
+      team_a_players: ['Rohit', 'Kohli', 'Rahul', 'Hardik', 'Jadeja', 'Bumrah', 'Shami', 'Kuldeep'],
+      team_b_players: ['Warner', 'Head', 'Smith', 'Maxwell', 'Stoinis', 'Starc', 'Cummins', 'Zampa'],
+      settings: {
+        last_man_standing: false,
+        wide_runs: 1,
+        no_ball_runs: 1,
+        wide_reball: true,
+        no_ball_reball: true,
+        free_hit_on_no_ball: false,
+      }
+    },
+
+    get filteredSavedPlayers() {
+      if (!this.savedPlayerSearch.trim()) return this.savedPlayers;
+      const q = this.savedPlayerSearch.trim().toLowerCase();
+      return this.savedPlayers.filter(p => p.name.toLowerCase().includes(q));
+    },
+
+    isPlayerInTeam(name, teamKey) {
+      const list = teamKey === 'team_a' ? this.form.team_a_players : this.form.team_b_players;
+      return list.includes(name);
+    },
+
+    addPlayerToTeam(teamKey, name) {
+      const clean = name.trim();
+      if (!clean) return;
+      const targetList = teamKey === 'team_a' ? this.form.team_a_players : this.form.team_b_players;
+      const otherList = teamKey === 'team_a' ? this.form.team_b_players : this.form.team_a_players;
+      
+      if (targetList.includes(clean)) {
+        alert(`${clean} is already added to this team`);
+        return;
+      }
+      if (otherList.includes(clean)) {
+        if (!confirm(`${clean} is already in the other team. Move to this team?`)) {
+          return;
+        }
+        const idx = otherList.indexOf(clean);
+        otherList.splice(idx, 1);
+      }
+      targetList.push(clean);
+      if (teamKey === 'team_a') this.newPlayerA = '';
+      else this.newPlayerB = '';
+    },
+
+    removePlayer(teamKey, index) {
+      if (teamKey === 'team_a') {
+        this.form.team_a_players.splice(index, 1);
+      } else {
+        this.form.team_b_players.splice(index, 1);
+      }
+    },
+
+    movePlayer(fromTeamKey, index) {
+      const fromList = fromTeamKey === 'team_a' ? this.form.team_a_players : this.form.team_b_players;
+      const toList = fromTeamKey === 'team_a' ? this.form.team_b_players : this.form.team_a_players;
+      const player = fromList.splice(index, 1)[0];
+      if (player && !toList.includes(player)) {
+        toList.push(player);
+      }
+    },
+
+    openBulkPaste(teamKey) {
+      this.bulkPasteTarget = teamKey;
+      this.bulkPasteText = '';
+      this.showBulkPasteModal = true;
+    },
+
+    applyBulkPaste() {
+      if (!this.bulkPasteText.trim()) {
+        this.showBulkPasteModal = false;
+        return;
+      }
+      const names = this.bulkPasteText
+        .split(/[\n,]+/)
+        .map(s => s.trim())
+        .filter(Boolean);
+      
+      const targetList = this.bulkPasteTarget === 'team_a' ? this.form.team_a_players : this.form.team_b_players;
+      for (const name of names) {
+        if (!targetList.includes(name)) {
+          targetList.push(name);
+        }
+      }
+      this.showBulkPasteModal = false;
+      this.bulkPasteText = '';
+    },
+
+    loadDemoSquads() {
+      this.form.team_a_players = ['Rohit', 'Kohli', 'Rahul', 'Hardik', 'Jadeja', 'Bumrah', 'Shami', 'Kuldeep'];
+      this.form.team_b_players = ['Warner', 'Head', 'Smith', 'Maxwell', 'Stoinis', 'Starc', 'Cummins', 'Zampa'];
+    },
+
+    clearTeam(teamKey) {
+      if (teamKey === 'team_a') this.form.team_a_players = [];
+      else this.form.team_b_players = [];
+    },
+
+    async createMatch() {
+      if (this.form.team_a_players.length === 0 || this.form.team_b_players.length === 0) {
+        alert('Please add at least 1 player to each team squad.');
+        return;
+      }
+
+      this.loading = true;
+      try {
+        const payload = {
+          match_name: this.form.match_name,
+          venue: this.form.venue,
+          overs_per_innings: this.form.overs_per_innings,
+          players_per_side: this.form.players_per_side,
+          team_a_name: this.form.team_a_name,
+          team_b_name: this.form.team_b_name,
+          team_a_players: this.form.team_a_players,
+          team_b_players: this.form.team_b_players,
+          settings: this.form.settings
+        };
+
+        const res = await fetch('/api/matches', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        window.location.href = `/match/${data.id}/toss`;
+      } catch (err) {
+        alert('Error creating match: ' + err.message);
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async deleteMatch(matchId, matchName) {
+      if (!confirm(`Are you sure you want to delete '${matchName}'?\nAll innings, ball deliveries, and scorecards for this match will be permanently erased.`)) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/matches/${matchId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(await res.text());
+        window.location.reload();
+      } catch (err) {
+        alert('Failed to delete match: ' + err.message);
+      }
+    },
+
+    async resetMatch(matchId, matchName) {
+      if (!confirm(`Reset match '${matchName}' back to initial toss state?\nAll recorded balls and wickets will be cleared, while rosters and rules remain.`)) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/matches/${matchId}/reset`, { method: 'POST' });
+        if (!res.ok) throw new Error(await res.text());
+        window.location.href = `/match/${matchId}/toss`;
+      } catch (err) {
+        alert('Failed to reset match: ' + err.message);
+      }
+    },
+
+    async cleanupCompletedMatches() {
+      if (!confirm('Are you sure you want to delete ALL completed matches?')) {
+        return;
+      }
+      try {
+        const res = await fetch('/api/matches?status=completed', { method: 'DELETE' });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        alert(data.message || 'Completed matches cleared');
+        window.location.reload();
+      } catch (err) {
+        alert('Failed to clear matches: ' + err.message);
+      }
+    },
+
+    async deleteSavedPlayer(playerId, playerName) {
+      if (!confirm(`Delete player '${playerName}' from saved directory?`)) {
+        return;
+      }
+      try {
+        let res = await fetch(`/api/players/${playerId}`, { method: 'DELETE' });
+        if (res.status === 400) {
+          const data = await res.json();
+          if (confirm(`${data.detail}\nForce delete player anyway?`)) {
+            res = await fetch(`/api/players/${playerId}?force=true`, { method: 'DELETE' });
+          } else {
+            return;
+          }
+        }
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.detail || 'Failed to delete player');
+          return;
+        }
+        this.savedPlayers = this.savedPlayers.filter(p => p.id !== playerId);
+      } catch (err) {
+        alert('Error deleting player: ' + err.message);
+      }
+    }
+  }
+}
+</script>
+{% endblock %}

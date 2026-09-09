@@ -1,0 +1,1044 @@
+{% extends "base.html" %}
+
+{% block title %}Live Scorer - {{ match.match_name }}{% endblock %}
+
+{% block content %}
+<div x-data="cricScorer({{ match.id }})" x-init="initScorer()" class="max-w-lg mx-auto space-y-3 pb-8 select-none">
+
+  <!-- TOP HEADER SCOREBOARD (Outdoor High Contrast) -->
+  <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-4 shadow-xl relative overflow-hidden">
+    
+    <!-- Match Title & Status Header -->
+    <div class="flex items-center justify-between text-xs mb-2">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-white tracking-wide" x-text="matchName"></span>
+        <span class="text-slate-400">·</span>
+        <span class="text-emerald-400 font-semibold uppercase text-[11px]" x-text="'Inn ' + (innings ? innings.innings_number : '1')"></span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <a :href="'/match/' + matchId + '/scorecard'" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white">
+          Scorecard ↗
+        </a>
+        <a :href="'/match/' + matchId + '/live'" target="_blank" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-emerald-400 hover:text-white flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          Live
+        </a>
+        <button type="button" @click="openMatchMenu = true" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center gap-1" title="Match options & danger zone">
+          <span>⚙️</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Big Score Display -->
+    <div class="flex items-baseline justify-between py-1">
+      <div>
+        <span class="text-4xl font-black tracking-tight text-white" x-text="(innings ? innings.total_runs : 0) + '/' + (innings ? innings.total_wickets : 0)"></span>
+        <span class="text-base text-slate-400 ml-1.5 font-medium">
+          (<span x-text="innings ? innings.overs_str : '0.0'"></span> / <span x-text="maxOvers"></span> ov)
+        </span>
+      </div>
+
+      <div class="text-right">
+        <div class="text-xs text-slate-400">CRR: <span class="text-white font-bold font-mono" x-text="innings ? innings.run_rate : '0.0'"></span></div>
+        <template x-if="innings && innings.target_runs">
+          <div class="text-xs text-amber-400 font-semibold mt-0.5">
+            Target: <span x-text="innings.target_runs"></span> (<span x-text="innings.runs_needed"></span> off <span x-text="innings.balls_remaining"></span>b)
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Required Run Rate Banner (if chasing) -->
+    <template x-if="innings && innings.target_runs">
+      <div class="mt-2 bg-amber-950/40 border border-amber-800/40 rounded-lg px-3 py-1.5 flex items-center justify-between text-xs text-amber-300">
+        <span>Need <strong x-text="innings.runs_needed"></strong> runs to win</span>
+        <span>Req RR: <strong x-text="innings.required_run_rate"></strong></span>
+      </div>
+    </template>
+  </div>
+
+  <!-- ACTIVE BATSMEN & BOWLER STATS -->
+  <div class="grid grid-cols-1 gap-2 text-xs">
+    
+    <!-- Batsmen Card -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3 space-y-2">
+      <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+        <span>Batting: <strong class="text-white" x-text="innings ? innings.batting_team : ''"></strong></span>
+        <button @click="swapStrike()" class="text-slate-400 hover:text-emerald-400 flex items-center gap-1 font-normal text-[11px] bg-slate-800/60 px-2 py-0.5 rounded">
+          ⇄ Swap Ends
+        </button>
+      </div>
+
+      <!-- Striker -->
+      <div class="flex items-center justify-between bg-slate-950/80 p-2.5 rounded-lg border border-emerald-500/30">
+        <div class="flex items-center gap-1.5">
+          <span class="text-emerald-400 font-black">🏏*</span>
+          <template x-if="striker">
+            <span class="font-bold text-white text-sm" x-text="striker.player_name"></span>
+          </template>
+          <template x-if="!striker">
+            <button type="button" @click="openBatsmanSelector(true)" class="text-amber-400 hover:text-amber-300 font-bold text-xs bg-amber-950/50 border border-amber-500/40 px-2 py-0.5 rounded flex items-center gap-1">
+              <span>+ Select Striker</span>
+            </button>
+          </template>
+        </div>
+        <div class="font-mono text-slate-300 text-xs" x-show="striker">
+          <strong class="text-white text-sm" x-text="striker ? striker.runs : 0"></strong>
+          <span class="text-slate-500">(<span x-text="striker ? striker.balls : 0"></span>)</span>
+          <span class="text-slate-400 text-[11px] ml-1">4s:<span x-text="striker ? striker.fours : 0"></span> 6s:<span x-text="striker ? striker.sixes : 0"></span></span>
+        </div>
+      </div>
+
+      <!-- Non-striker -->
+      <div class="flex items-center justify-between bg-slate-950/50 p-2 rounded-lg border border-slate-800">
+        <div class="flex items-center gap-1.5">
+          <span class="text-slate-500">⚾</span>
+          <template x-if="nonStriker">
+            <span class="font-semibold text-slate-300 text-sm" x-text="nonStriker.player_name"></span>
+          </template>
+          <template x-if="!nonStriker && !settings.last_man_standing">
+            <button type="button" @click="openBatsmanSelector(false)" class="text-amber-400 hover:text-amber-300 font-bold text-xs bg-amber-950/50 border border-amber-500/40 px-2 py-0.5 rounded flex items-center gap-1">
+              <span>+ Select Non-Striker</span>
+            </button>
+          </template>
+          <template x-if="!nonStriker && settings.last_man_standing">
+            <span class="text-amber-400/80 text-[11px] italic">Last Man Standing</span>
+          </template>
+        </div>
+        <div class="font-mono text-slate-400 text-xs" x-show="nonStriker">
+          <strong class="text-slate-200" x-text="nonStriker ? nonStriker.runs : 0"></strong>
+          <span class="text-slate-500">(<span x-text="nonStriker ? nonStriker.balls : 0"></span>)</span>
+          <span class="text-slate-400 text-[11px] ml-1">4s:<span x-text="nonStriker ? nonStriker.fours : 0"></span> 6s:<span x-text="nonStriker ? nonStriker.sixes : 0"></span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Bowler Card -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+      <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between mb-1.5">
+        <span>Bowling: <strong class="text-white" x-text="innings ? innings.bowling_team : ''"></strong></span>
+        <button @click="openBowlerModal = true" class="text-emerald-400 hover:underline font-normal text-[11px]">
+          Change Bowler
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span class="font-bold text-white text-sm" x-text="bowler ? bowler.player_name : 'Select Bowler'"></span>
+        </div>
+        <div class="font-mono text-xs text-slate-300">
+          <span class="text-white font-bold" x-text="bowler ? bowler.overs_str : '0.0'"></span>-<span x-text="bowler ? bowler.maidens : 0"></span>-<span x-text="bowler ? bowler.runs_conceded : 0"></span>-<strong class="text-emerald-400" x-text="bowler ? bowler.wickets : 0"></strong>
+          <span class="text-slate-500 ml-1 text-[11px]">Econ:<span x-text="bowler ? bowler.economy : '0.0'"></span></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CURRENT OVER RIBBON -->
+  <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-1.5">
+    <div class="flex items-center justify-between text-[11px] text-slate-400">
+      <span class="font-bold tracking-wider uppercase">This Over</span>
+      <span class="font-mono text-slate-500" x-text="'Legal balls: ' + (innings ? (innings.legal_balls % 6) : 0) + '/6'"></span>
+    </div>
+
+    <div class="flex items-center gap-2 overflow-x-auto py-1 min-h-[44px]">
+      <template x-for="(badge, idx) in recentBalls" :key="idx">
+        <span class="w-9 h-9 rounded-lg flex items-center justify-center font-black font-mono text-xs shadow-sm transition-all"
+          :class="{
+            'bg-slate-800 text-slate-400': badge === '•' || badge === '0',
+            'bg-emerald-600/30 text-emerald-400 border border-emerald-500/40': badge === '1' || badge === '2' || badge === '3',
+            'bg-blue-600 text-white shadow-blue-500/20': badge === '4',
+            'bg-purple-600 text-white shadow-purple-500/20': badge === '6',
+            'bg-amber-600/30 text-amber-400 border border-amber-500/40': badge.includes('Wd') || badge.includes('Nb'),
+            'bg-red-600 text-white shadow-red-500/30': badge.startsWith('W')
+          }"
+          x-text="badge"></span>
+      </template>
+
+      <span x-show="!recentBalls || recentBalls.length === 0" class="text-xs text-slate-500 italic">
+        Over not started yet
+      </span>
+    </div>
+  </div>
+
+  <!-- THUMB ZONE TOUCH KEYPAD -->
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-2xl space-y-2.5">
+    
+    <!-- ROW 1: RUNS (0, 1, 2, 3, 4, 6) -->
+    <div class="grid grid-cols-6 gap-2">
+      <button @click="scoreBall(0)" class="h-14 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-black text-xl active:scale-95 transition-transform flex flex-col items-center justify-center">
+        <span>0</span>
+        <span class="text-[9px] font-normal text-slate-500">dot</span>
+      </button>
+
+      <button @click="scoreBall(1)" class="h-14 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-emerald-400 font-black text-xl active:scale-95 transition-transform flex flex-col items-center justify-center">
+        <span>1</span>
+        <span class="text-[9px] font-normal text-slate-500">single</span>
+      </button>
+
+      <button @click="scoreBall(2)" class="h-14 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-emerald-400 font-black text-xl active:scale-95 transition-transform flex flex-col items-center justify-center">
+        <span>2</span>
+        <span class="text-[9px] font-normal text-slate-500">double</span>
+      </button>
+
+      <button @click="scoreBall(3)" class="h-14 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-emerald-400 font-black text-xl active:scale-95 transition-transform flex flex-col items-center justify-center">
+        <span>3</span>
+        <span class="text-[9px] font-normal text-slate-500">triple</span>
+      </button>
+
+      <button @click="scoreBall(4)" class="h-14 rounded-xl bg-blue-950/80 hover:bg-blue-900/90 border border-blue-800 text-blue-400 font-black text-xl active:scale-95 transition-transform flex flex-col items-center justify-center shadow-lg shadow-blue-950/50">
+        <span>4</span>
+        <span class="text-[9px] font-bold uppercase text-blue-300">FOUR</span>
+      </button>
+
+      <button @click="scoreBall(6)" class="h-14 rounded-xl bg-purple-950/80 hover:bg-purple-900/90 border border-purple-800 text-purple-400 font-black text-xl active:scale-95 transition-transform flex flex-col items-center justify-center shadow-lg shadow-purple-950/50">
+        <span>6</span>
+        <span class="text-[9px] font-bold uppercase text-purple-300">SIX</span>
+      </button>
+    </div>
+
+    <!-- ROW 2: EXTRAS (Wide, No Ball, Bye, Leg Bye) -->
+    <div class="grid grid-cols-4 gap-2">
+      <button @click="promptExtra('wide')" class="h-12 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-amber-400 font-bold text-xs active:scale-95 transition-transform flex items-center justify-center gap-1">
+        <span>Wide</span>
+        <span class="text-[10px] text-slate-500" x-text="settings && settings.wide_runs === 0 ? '(+0)' : (settings ? '(+' + settings.wide_runs + ')' : '(+1)')"></span>
+      </button>
+
+      <button @click="promptExtra('no_ball')" class="h-12 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-amber-400 font-bold text-xs active:scale-95 transition-transform flex items-center justify-center gap-1">
+        <span>No Ball</span>
+        <span class="text-[10px] text-slate-500" x-text="settings && settings.no_ball_runs === 0 ? '(+0)' : (settings ? '(+' + settings.no_ball_runs + ')' : '(+1)')"></span>
+      </button>
+
+      <button @click="promptExtra('bye')" class="h-12 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-semibold text-xs active:scale-95 transition-transform flex items-center justify-center">
+        <span>Bye (B)</span>
+      </button>
+
+      <button @click="promptExtra('leg_bye')" class="h-12 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-semibold text-xs active:scale-95 transition-transform flex items-center justify-center">
+        <span>Leg Bye (LB)</span>
+      </button>
+    </div>
+
+    <!-- ROW 3: MAJOR ACTIONS (WICKET, UNDO, SWAP) -->
+    <div class="grid grid-cols-12 gap-2 pt-1">
+      <!-- Bright Red Wicket Button -->
+      <button @click="openWicket()" class="col-span-6 h-13 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-sm active:scale-95 transition-transform shadow-lg shadow-red-600/30 flex items-center justify-center gap-1.5 tracking-wide">
+        <span>🚨 WICKET</span>
+      </button>
+
+      <!-- Instant Undo Button -->
+      <button @click="undoLastBall()" class="col-span-3 h-13 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs active:scale-95 transition-transform flex items-center justify-center gap-1">
+        <span>⎌ Undo</span>
+      </button>
+
+      <!-- Swap Strike Button -->
+      <button @click="swapStrike()" class="col-span-3 h-13 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs active:scale-95 transition-transform flex items-center justify-center gap-1">
+        <span>⇄ Swap</span>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- 0. MATCH OPTIONS / DANGER ZONE MODAL -->
+  <div x-show="openMatchMenu" x-cloak class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3">
+    <div @click.away="openMatchMenu = false" class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 space-y-4 text-xs shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+          <span>⚙️ Match Settings & Danger Zone</span>
+        </h3>
+        <button type="button" @click="openMatchMenu = false" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div class="space-y-2.5">
+        <a :href="'/match/' + matchId + '/scorecard'" class="w-full py-2.5 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-200 font-semibold flex items-center justify-between">
+          <span>📊 Full Digital Scorecard</span>
+          <span class="text-emerald-400">&rarr;</span>
+        </a>
+
+        <button type="button" @click="resetMatch()" class="w-full py-2.5 px-3 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800/40 text-amber-300 font-semibold flex items-center justify-between transition-all">
+          <span>🔄 Reset Match to Start</span>
+          <span class="text-[10px] text-amber-400">Clear balls</span>
+        </button>
+
+        <button type="button" @click="deleteMatch()" class="w-full py-2.5 px-3 rounded-xl bg-red-950/50 hover:bg-red-900/70 border border-red-800/40 text-red-300 font-bold flex items-center justify-between transition-all">
+          <span>🗑️ Delete Match Permanently</span>
+          <span class="text-[10px] text-red-400">Erase all</span>
+        </button>
+      </div>
+
+      <div class="pt-2 border-t border-slate-800 text-right">
+        <button type="button" @click="openMatchMenu = false" class="px-3.5 py-1.5 rounded-lg bg-slate-800 text-slate-300">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. WICKET MODAL -->
+  <div x-show="openWicketModal" x-cloak class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3">
+    <div @click.away="openWicketModal = false" class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-4 space-y-4 text-xs shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h3 class="text-sm font-bold text-red-400 flex items-center gap-1.5">
+          <span>🚨 Record Wicket Fall</span>
+        </h3>
+        <button @click="openWicketModal = false" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div class="space-y-3">
+        <!-- Dismissal Type -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Dismissal Type</label>
+          <select x-model="wicketForm.dismissal_type" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none">
+            <option value="bowled">Bowled</option>
+            <option value="caught">Caught</option>
+            <option value="run_out">Run Out</option>
+            <option value="stumped">Stumped</option>
+            <option value="hit_wicket">Hit Wicket</option>
+          </select>
+        </div>
+
+        <!-- Player Out -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Player Out</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" @click="wicketForm.player_out_id = striker ? striker.player_id : null; wicketError = ''"
+              :class="(wicketForm.player_out_id === (striker ? striker.player_id : null)) ? 'bg-red-600 text-white font-bold' : 'bg-slate-950 text-slate-300 border border-slate-800'"
+              class="p-2.5 rounded-lg text-center transition-all">
+              Striker: <span x-text="striker ? striker.player_name : ''"></span>
+            </button>
+            <button type="button" @click="wicketForm.player_out_id = nonStriker ? nonStriker.player_id : null; wicketError = ''"
+              :class="(wicketForm.player_out_id === (nonStriker ? nonStriker.player_id : null)) ? 'bg-red-600 text-white font-bold' : 'bg-slate-950 text-slate-300 border border-slate-800'"
+              class="p-2.5 rounded-lg text-center transition-all">
+              Non-Striker: <span x-text="nonStriker ? nonStriker.player_name : ''"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Fielder (if caught / run out / stumped) -->
+        <div x-show="['caught', 'run_out', 'stumped'].includes(wicketForm.dismissal_type)">
+          <label class="block text-slate-300 font-semibold mb-1">Fielder / Keeper</label>
+          <select x-model="wicketForm.fielder_id" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none">
+            <option value="">-- None / Direct Hit --</option>
+            <template x-for="p in fieldingPlayers" :key="p.id">
+              <option :value="p.id" x-text="p.name"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- Incoming Batsman -->
+        <div>
+          <!-- If this wicket ends innings (All Out) -->
+          <template x-if="isWicketAllOut">
+            <div class="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-center font-bold text-xs space-y-1">
+              <div>🏆 Final Wicket — Team will be All Out!</div>
+              <div class="text-[10px] text-amber-400 font-normal">No next batter required. Innings will conclude upon confirmation.</div>
+            </div>
+          </template>
+
+          <!-- If innings continues -> NEXT BATTER IS COMPULSORY -->
+          <template x-if="!isWicketAllOut">
+            <div class="space-y-2 p-3 rounded-xl bg-slate-950/70 border border-emerald-500/30">
+              <div class="flex items-center justify-between">
+                <label class="font-bold text-white flex items-center gap-1.5">
+                  <span>🏏 Next Batter</span>
+                  <span class="text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded bg-red-600 text-white">Compulsory *</span>
+                </label>
+                <span class="text-[10px] text-slate-400" x-text="availableBatters.length + ' in dugout'"></span>
+              </div>
+
+              <!-- 1-Tap Quick Select Pills -->
+              <template x-if="availableBatters.length > 0">
+                <div>
+                  <div class="text-[10px] text-slate-400 mb-1 font-semibold">Tap to select:</div>
+                  <div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                    <template x-for="p in availableBatters" :key="p.id">
+                      <button type="button" @click="wicketForm.new_batsman_name_or_id = String(p.id); wicketForm.custom_batsman_name = ''; wicketError = ''"
+                        :class="wicketForm.new_batsman_name_or_id == String(p.id) ? 'bg-emerald-600 text-white font-bold ring-2 ring-emerald-400 shadow' : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700'"
+                        class="px-2.5 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 active:scale-95">
+                        <span>🏏</span>
+                        <span x-text="p.name"></span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Dropdown fallback -->
+              <select x-model="wicketForm.new_batsman_name_or_id" @change="wicketError = ''" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                <option value="">-- Or Choose from Roster --</option>
+                <template x-for="p in availableBatters" :key="p.id">
+                  <option :value="p.id" x-text="p.name"></option>
+                </template>
+              </select>
+
+              <!-- Custom name input -->
+              <input type="text" x-model="wicketForm.custom_batsman_name" @input="if (wicketForm.custom_batsman_name.trim()) { wicketForm.new_batsman_name_or_id = ''; wicketError = ''; }" placeholder="Or type new player name..." class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-[11px]">
+            </div>
+          </template>
+        </div>
+
+        <!-- In-modal Error Alert -->
+        <template x-if="wicketError">
+          <div class="p-2.5 rounded-xl bg-red-950/80 border border-red-500/60 text-red-200 text-xs font-semibold flex items-center gap-2">
+            <span>⚠️</span>
+            <span x-text="wicketError"></span>
+          </div>
+        </template>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+        <button type="button" @click="openWicketModal = false; wicketError = ''" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300">
+          Cancel
+        </button>
+        <button type="button" @click="confirmWicket()" class="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold">
+          Confirm Wicket
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1.5 DEDICATED SELECT NEXT BATTER MODAL -->
+  <div x-show="openBatsmanModal" x-cloak class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3">
+    <div @click.away="openBatsmanModal = false" class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-4 space-y-3 text-xs shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+          <span>🏏 Select Next Batter</span>
+        </h3>
+        <button type="button" @click="openBatsmanModal = false" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
+      </div>
+
+      <div class="space-y-3">
+        <p class="text-slate-400 text-xs">
+          Select who will bat as <strong class="text-emerald-400" x-text="selectBatsmanIsStriker ? 'Striker' : 'Non-Striker'"></strong> for <span class="text-white font-semibold" x-text="innings ? innings.batting_team : ''"></span>.
+        </p>
+
+        <!-- Tap to select pills -->
+        <template x-if="availableBatters.length > 0">
+          <div>
+            <div class="text-[10px] text-slate-400 mb-1 font-semibold">Available in dugout:</div>
+            <div class="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+              <template x-for="p in availableBatters" :key="p.id">
+                <button type="button" @click="submitSelectBatsman(p.id)"
+                  class="px-2.5 py-1.5 rounded-lg text-xs bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-emerald-500/50 transition-all flex items-center gap-1.5 active:scale-95">
+                  <span>🏏</span>
+                  <span x-text="p.name"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- Or custom name input -->
+        <div class="pt-2 border-t border-slate-800">
+          <label class="block text-slate-400 text-[11px] mb-1">Or enter player name:</label>
+          <div class="flex gap-2">
+            <input type="text" x-model="customBatsmanInput" placeholder="Player name..."
+              class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+            <button type="button" @click="submitSelectBatsman(customBatsmanInput)"
+              class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs">
+              Select
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-800 text-right">
+        <button type="button" @click="openBatsmanModal = false" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. NEW BOWLER MODAL (Over Complete) -->
+  <div x-show="openBowlerModal" x-cloak class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-4 space-y-3 text-xs shadow-2xl">
+      <div class="border-b border-slate-800 pb-2.5 flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+            <span>⚾ Select Next Bowler</span>
+          </h3>
+          <p class="text-[11px] text-slate-400">
+            Over completed. Showing match bowling figures for <span class="text-emerald-400 font-semibold" x-text="innings ? innings.bowling_team : 'Fielding Team'"></span>.
+          </p>
+        </div>
+        <button type="button" @click="openBowlerModal = false" class="text-slate-400 hover:text-white text-lg leading-none p-1">&times;</button>
+      </div>
+
+      <!-- Quick Search input -->
+      <div>
+        <input type="text" x-model="bowlerSearch" placeholder="🔍 Search bowler by name..."
+          class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+      </div>
+
+      <!-- Fielding Bowlers List with Match Figures -->
+      <div class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+        <template x-for="p in filteredFieldingBowlers" :key="p.id">
+          <div class="p-3 rounded-xl border transition-all"
+            :class="isLastOverBowler(p.id) 
+              ? 'bg-amber-950/20 border-amber-500/30' 
+              : 'bg-slate-950 hover:bg-slate-800/40 border-slate-800'">
+            
+            <!-- Top Header: Bowler Name + Status Badge -->
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[11px] font-bold text-slate-300">⚾</span>
+                <span class="text-white font-bold text-sm" x-text="p.name"></span>
+              </div>
+
+              <!-- Status badge -->
+              <div>
+                <template x-if="isLastOverBowler(p.id)">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    ⚠️ Bowled Last Over
+                  </span>
+                </template>
+                <template x-if="!isLastOverBowler(p.id) && getBowlerMatchFigures(p.id) && getBowlerMatchFigures(p.id).legal_balls > 0">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    <span x-text="getBowlerMatchFigures(p.id).overs_str + ' Ov Bowled'"></span>
+                  </span>
+                </template>
+                <template x-if="!isLastOverBowler(p.id) && (!getBowlerMatchFigures(p.id) || getBowlerMatchFigures(p.id).legal_balls === 0)">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] text-slate-400 bg-slate-900 border border-slate-800">
+                    Yet to bowl
+                  </span>
+                </template>
+              </div>
+            </div>
+
+            <!-- Match Figures Display (Strictly Ongoing Match) -->
+            <template x-if="getBowlerMatchFigures(p.id) && getBowlerMatchFigures(p.id).legal_balls > 0">
+              <div class="mt-2 space-y-1.5">
+                <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                  Ongoing Match Figures:
+                </div>
+                <div class="grid grid-cols-5 gap-1.5 p-2 rounded-lg bg-slate-900 border border-slate-800 text-center">
+                  <div>
+                    <span class="block text-[9px] uppercase tracking-wider text-slate-500">Overs</span>
+                    <span class="text-xs font-bold text-white" x-text="getBowlerMatchFigures(p.id).overs_str"></span>
+                  </div>
+                  <div>
+                    <span class="block text-[9px] uppercase tracking-wider text-slate-500">Mdns</span>
+                    <span class="text-xs font-bold text-white" x-text="getBowlerMatchFigures(p.id).maidens"></span>
+                  </div>
+                  <div>
+                    <span class="block text-[9px] uppercase tracking-wider text-slate-500">Runs</span>
+                    <span class="text-xs font-bold text-amber-400" x-text="getBowlerMatchFigures(p.id).runs_conceded"></span>
+                  </div>
+                  <div>
+                    <span class="block text-[9px] uppercase tracking-wider text-slate-500">Wkts</span>
+                    <span class="text-xs font-bold text-emerald-400" x-text="getBowlerMatchFigures(p.id).wickets"></span>
+                  </div>
+                  <div>
+                    <span class="block text-[9px] uppercase tracking-wider text-slate-500">Econ</span>
+                    <span class="text-xs font-bold text-blue-400" x-text="getBowlerMatchFigures(p.id).economy"></span>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-3 text-[10px] text-slate-400 px-1">
+                  <span>Wides: <strong class="text-slate-200" x-text="getBowlerMatchFigures(p.id).wides"></strong></span>
+                  <span>No-Balls: <strong class="text-slate-200" x-text="getBowlerMatchFigures(p.id).no_balls"></strong></span>
+                </div>
+              </div>
+            </template>
+
+            <template x-if="!getBowlerMatchFigures(p.id) || getBowlerMatchFigures(p.id).legal_balls === 0">
+              <div class="mt-2 text-[11px] text-slate-400 bg-slate-900/60 p-2 rounded-lg border border-slate-800/60 flex items-center gap-2">
+                <span>🎯</span>
+                <span>Yet to bowl in this match (0.0 overs · 0 runs · 0 wickets)</span>
+              </div>
+            </template>
+
+            <!-- Action buttons -->
+            <div class="mt-2.5">
+              <template x-if="!isLastOverBowler(p.id)">
+                <button type="button" @click="selectBowler(p.id)"
+                  class="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1 shadow transition-all active:scale-95">
+                  <span>Select <span x-text="p.name"></span> for Next Over &rarr;</span>
+                </button>
+              </template>
+
+              <template x-if="isLastOverBowler(p.id)">
+                <div class="space-y-1.5 pt-1">
+                  <p class="text-[10px] text-amber-300">
+                    Rule: Bowler cannot bowl 2 consecutive overs in standard cricket.
+                  </p>
+                  <div class="flex items-center gap-2">
+                    <button type="button" disabled
+                      class="flex-1 py-1.5 px-2 rounded-lg bg-slate-800 text-slate-500 font-semibold text-[11px] cursor-not-allowed">
+                      Ineligible (Just Bowled)
+                    </button>
+                    <button type="button" @click="selectBowler(p.id, true)"
+                      class="py-1.5 px-3 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold text-[11px] flex items-center gap-1 active:scale-95"
+                      title="Gully rule override to allow same bowler">
+                      <span>⚡ Gully Override</span>
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+          </div>
+        </template>
+
+        <div x-show="filteredFieldingBowlers.length === 0" class="text-center py-6 text-slate-500 italic">
+          No bowlers match your search.
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-800 text-right">
+        <button type="button" @click="openBowlerModal = false" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium">
+          Cancel / Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. INNINGS BREAK / 2ND INNINGS START MODAL -->
+  <div x-show="matchStatus === 'innings_break'" x-cloak class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur flex items-center justify-center p-3">
+    <div class="bg-slate-900 border border-emerald-900/60 rounded-2xl max-w-md w-full p-5 space-y-4 text-xs shadow-2xl text-center">
+      <div class="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl mx-auto">
+        🏁
+      </div>
+      <h2 class="text-lg font-black text-white">1st Innings Complete!</h2>
+      <p class="text-slate-300">
+        Target for <strong class="text-emerald-400" x-text="innings ? innings.batting_team : ''"></strong>:
+        <span class="text-2xl font-black text-white block mt-1" x-text="(innings && innings.target_runs ? innings.target_runs : '') + ' Runs'"></span>
+      </p>
+
+      <div class="space-y-3 text-left pt-2 border-t border-slate-800">
+        <h4 class="font-bold text-slate-200">Select 2nd Innings Openers:</h4>
+        <div>
+          <label class="block text-slate-400 text-[11px] mb-1">
+            Striker (<span class="text-emerald-400 font-semibold" x-text="innings ? innings.batting_team : ''"></span>)
+          </label>
+          <select x-model="secondInn.striker" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white">
+            <option value="">-- Choose Striker --</option>
+            <template x-for="p in battingRoster" :key="p.id">
+              <option :value="p.id" x-text="p.name" :disabled="p.id == secondInn.nonStriker"></option>
+            </template>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 text-[11px] mb-1">
+            Non-Striker (<span class="text-emerald-400 font-semibold" x-text="innings ? innings.batting_team : ''"></span>)
+          </label>
+          <select x-model="secondInn.nonStriker" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white">
+            <option value="">-- Choose Non-Striker --</option>
+            <template x-for="p in battingRoster" :key="p.id">
+              <option :value="p.id" x-text="p.name" :disabled="p.id == secondInn.striker"></option>
+            </template>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 text-[11px] mb-1">
+            Opening Bowler (<span class="text-emerald-400 font-semibold" x-text="innings ? innings.bowling_team : ''"></span>)
+          </label>
+          <select x-model="secondInn.bowler" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white">
+            <option value="">-- Choose Opening Bowler --</option>
+            <template x-for="p in fieldingPlayers" :key="p.id">
+              <option :value="p.id" x-text="p.name"></option>
+            </template>
+          </select>
+        </div>
+      </div>
+
+      <button @click="startSecondInnings()" class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm">
+        Start 2nd Innings Chase &rarr;
+      </button>
+    </div>
+  </div>
+
+  <!-- 4. MATCH COMPLETED BANNER -->
+  <div x-show="matchStatus === 'completed'" x-cloak class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur flex items-center justify-center p-3">
+    <div class="bg-slate-900 border border-emerald-500/50 rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+      <div class="text-4xl">🏆</div>
+      <h2 class="text-xl font-black text-white">Match Finished!</h2>
+      <div class="p-3 bg-emerald-950/40 border border-emerald-800/40 rounded-xl text-emerald-400 font-bold text-base" x-text="result"></div>
+
+      <div class="flex flex-col gap-2 pt-2">
+        <a :href="'/match/' + matchId + '/scorecard'" class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs">
+          View Digital Scorecard
+        </a>
+        <a :href="'/match/' + matchId + '/scorecard#whatsapp'" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-1">
+          <span>Generate WhatsApp Card</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function cricScorer(matchId) {
+  return {
+    matchId: matchId,
+    matchName: "{{ match.match_name }}",
+    maxOvers: {{ match.overs_per_innings }},
+    maxPlayersPerSide: {{ match.players_per_side }},
+    matchStatus: "{{ match.status }}",
+    settings: {
+      wide_runs: {{ settings.wide_runs if settings else 1 }},
+      no_ball_runs: {{ settings.no_ball_runs if settings else 1 }},
+      last_man_standing: {{ 'true' if settings and settings.last_man_standing else 'false' }}
+    },
+    result: null,
+    innings: null,
+    striker: null,
+    nonStriker: null,
+    bowler: null,
+    recentBalls: [],
+    allMatchPlayers: { team_a: { players: [] }, team_b: { players: [] } },
+
+    openMatchMenu: false,
+    openWicketModal: false,
+    openBowlerModal: false,
+    openBatsmanModal: false,
+    selectBatsmanIsStriker: true,
+    customBatsmanInput: '',
+    bowlerSearch: '',
+    wicketError: '',
+
+    wicketForm: {
+      dismissal_type: 'bowled',
+      player_out_id: null,
+      fielder_id: '',
+      new_batsman_name_or_id: '',
+      custom_batsman_name: '',
+    },
+
+    openWicket() {
+      this.wicketForm.dismissal_type = 'bowled';
+      this.wicketForm.player_out_id = this.striker ? this.striker.player_id : null;
+      this.wicketForm.fielder_id = '';
+      this.wicketForm.new_batsman_name_or_id = '';
+      this.wicketForm.custom_batsman_name = '';
+      this.wicketError = '';
+      this.openWicketModal = true;
+    },
+
+    openBatsmanSelector(isStriker) {
+      this.selectBatsmanIsStriker = isStriker;
+      this.customBatsmanInput = '';
+      this.openBatsmanModal = true;
+    },
+
+    secondInn: {
+      striker: '',
+      nonStriker: '',
+      bowler: ''
+    },
+
+    async initScorer() {
+      await this.loadPlayers();
+      await this.refreshState();
+    },
+
+    async loadPlayers() {
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}/players`);
+        if (res.ok) {
+          this.allMatchPlayers = await res.json();
+        }
+      } catch (e) {
+        console.error('Failed to load players', e);
+      }
+    },
+
+    get battingRoster() {
+      if (!this.innings) return [];
+      return this.innings.batting_team === this.allMatchPlayers.team_a.name
+        ? this.allMatchPlayers.team_a.players
+        : this.allMatchPlayers.team_b.players;
+    },
+
+    get fieldingPlayers() {
+      if (!this.innings) return [];
+      return this.innings.bowling_team === this.allMatchPlayers.team_a.name
+        ? this.allMatchPlayers.team_a.players
+        : this.allMatchPlayers.team_b.players;
+    },
+
+    get availableBatters() {
+      if (!this.innings) return [];
+      const outOrBattingIds = this.innings.batsmen.map(b => b.player_id);
+      return this.battingRoster.filter(p => !outOrBattingIds.includes(p.id));
+    },
+
+    get isWicketAllOut() {
+      if (!this.innings) return false;
+      const maxW = this.settings.last_man_standing
+        ? this.maxPlayersPerSide
+        : Math.max(1, this.maxPlayersPerSide - 1);
+      return (this.innings.total_wickets + 1) >= maxW;
+    },
+
+    getBowlerMatchFigures(playerId) {
+      if (!this.innings || !this.innings.bowlers) return null;
+      return this.innings.bowlers.find(b => b.player_id === playerId) || null;
+    },
+
+    isLastOverBowler(playerId) {
+      return !!(this.innings && this.innings.last_over_bowler_id === playerId);
+    },
+
+    get filteredFieldingBowlers() {
+      if (!this.fieldingPlayers) return [];
+      if (!this.bowlerSearch.trim()) return this.fieldingPlayers;
+      const q = this.bowlerSearch.trim().toLowerCase();
+      return this.fieldingPlayers.filter(p => p.name.toLowerCase().includes(q));
+    },
+
+    async refreshState() {
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}/live-summary`);
+        if (!res.ok) return;
+        const data = await res.json();
+        this.matchStatus = data.status;
+        this.result = data.result;
+
+        if (data.innings) {
+          this.innings = data.innings;
+          this.recentBalls = data.innings.recent_balls || [];
+          this.striker = data.innings.batsmen.find(b => b.is_striker) || null;
+          this.nonStriker = data.innings.batsmen.find(b => b.is_batting && !b.is_striker) || null;
+          this.bowler = data.innings.bowlers.find(b => b.is_bowling) || null;
+
+          if (!this.bowler && this.matchStatus === 'in_progress') {
+            this.openBowlerModal = true;
+          }
+        }
+      } catch (err) {
+        console.error('Error refreshing state', err);
+      }
+    },
+
+    triggerHaptic() {
+      if (navigator.vibrate) {
+        navigator.vibrate(40);
+      }
+    },
+
+    async scoreBall(runs, extraType = null, extraRuns = 0) {
+      this.triggerHaptic();
+      const payload = {
+        batsman_runs: runs,
+        extra_type: extraType,
+        extra_runs: extraRuns,
+        is_wicket: false
+      };
+
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}/ball`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.detail || 'Error recording delivery');
+          return;
+        }
+        const data = await res.json();
+        await this.refreshState();
+
+        if (data.status_info && data.status_info.needs_bowler) {
+          this.openBowlerModal = true;
+        }
+      } catch (err) {
+        alert('Network error recording ball');
+      }
+    },
+
+    async promptExtra(type) {
+      if (type === 'wide') {
+        const addRuns = prompt('Additional runs run on Wide? (Enter 0 if none)', '0');
+        if (addRuns === null) return;
+        this.scoreBall(0, 'wide', parseInt(addRuns) || 0);
+      } else if (type === 'no_ball') {
+        const batRuns = prompt('Runs scored off bat on No Ball? (0, 1, 2, 4, 6)', '0');
+        if (batRuns === null) return;
+        this.scoreBall(parseInt(batRuns) || 0, 'no_ball', 0);
+      } else if (type === 'bye' || type === 'leg_bye') {
+        const runs = prompt(`Runs scored as ${type.toUpperCase()}? (1, 2, 3, 4)`, '1');
+        if (runs === null) return;
+        this.scoreBall(0, type, parseInt(runs) || 1);
+      }
+    },
+
+    async confirmWicket() {
+      this.wicketError = '';
+      if (!this.wicketForm.player_out_id) {
+        this.wicketError = 'Please select which batsman is out (Striker or Non-Striker).';
+        return;
+      }
+
+      const incoming = this.wicketForm.custom_batsman_name.trim() || this.wicketForm.new_batsman_name_or_id;
+
+      // Compulsory next batter check: if innings does not end on this wicket, next batter is mandatory
+      if (!this.isWicketAllOut && !incoming) {
+        this.wicketError = 'Selecting the next batter is compulsory before confirming the wicket.';
+        return;
+      }
+
+      this.triggerHaptic();
+      const payload = {
+        batsman_runs: 0,
+        is_wicket: true,
+        dismissal_type: this.wicketForm.dismissal_type,
+        player_out_id: this.wicketForm.player_out_id,
+        fielder_id: this.wicketForm.fielder_id ? parseInt(this.wicketForm.fielder_id) : null,
+        new_batsman_name_or_id: incoming ? String(incoming) : null
+      };
+
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}/ball`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          this.wicketError = err.detail || 'Error recording wicket';
+          return;
+        }
+        this.openWicketModal = false;
+        this.wicketForm.custom_batsman_name = '';
+        this.wicketForm.new_batsman_name_or_id = '';
+        this.wicketError = '';
+        await this.refreshState();
+      } catch (err) {
+        this.wicketError = 'Network error recording wicket';
+      }
+    },
+
+    async submitSelectBatsman(nameOrId) {
+      if (!nameOrId || !String(nameOrId).trim()) {
+        alert('Please select or enter a player name');
+        return;
+      }
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}/select-batsman`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            batsman_name_or_id: String(nameOrId).trim(),
+            is_striker: this.selectBatsmanIsStriker
+          })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.detail || 'Failed to select batsman');
+          return;
+        }
+        this.openBatsmanModal = false;
+        this.customBatsmanInput = '';
+        await this.refreshState();
+      } catch (e) {
+        alert('Network error selecting batsman');
+      }
+    },
+
+    async undoLastBall() {
+      if (!confirm('Undo the last delivery?')) return;
+      this.triggerHaptic();
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}/undo`, { method: 'POST' });
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.detail || 'Could not undo');
+          return;
+        }
+        await this.refreshState();
+      } catch (err) {
+        alert('Network error on undo');
+      }
+    },
+
+    async swapStrike() {
+      this.triggerHaptic();
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}/swap-strike`, { method: 'POST' });
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.detail || 'Could not swap strike');
+          return;
+        }
+        await this.refreshState();
+      } catch (err) {
+        alert('Network error');
+      }
+    },
+
+    async selectBowler(playerId, force = false) {
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}/select-bowler`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ bowler_id: playerId, force: force })
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ detail: 'Failed to set bowler' }));
+          alert(errData.detail || 'Failed to set bowler');
+          return;
+        }
+        this.openBowlerModal = false;
+        this.bowlerSearch = '';
+        await this.refreshState();
+      } catch (err) {
+        alert('Failed to set bowler: ' + err.message);
+      }
+    },
+
+    async startSecondInnings() {
+      if (!this.secondInn.striker || !this.secondInn.nonStriker || !this.secondInn.bowler) {
+        alert('Please select both opening batsmen and opening bowler');
+        return;
+      }
+      try {
+        const url = `/api/matches/${this.matchId}/start-second-innings?striker_id=${this.secondInn.striker}&non_striker_id=${this.secondInn.nonStriker}&bowler_id=${this.secondInn.bowler}`;
+        const res = await fetch(url, { method: 'POST' });
+        if (!res.ok) throw new Error(await res.text());
+        this.matchStatus = 'in_progress';
+        await this.refreshState();
+      } catch (err) {
+        alert('Failed to start 2nd innings: ' + err.message);
+      }
+    },
+
+    async resetMatch() {
+      if (!confirm('Are you sure you want to reset this match back to the start?\nAll ball deliveries and wickets will be cleared.')) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}/reset`, { method: 'POST' });
+        if (!res.ok) throw new Error(await res.text());
+        window.location.href = `/match/${this.matchId}/toss`;
+      } catch (err) {
+        alert('Failed to reset match: ' + err.message);
+      }
+    },
+
+    async deleteMatch() {
+      if (!confirm('Are you sure you want to permanently delete this match?\nAll scorecards, overs, and ball logs will be erased.')) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/matches/${this.matchId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(await res.text());
+        alert('Match deleted successfully');
+        window.location.href = '/';
+      } catch (err) {
+        alert('Failed to delete match: ' + err.message);
+      }
+    }
+  }
+}
+</script>
+{% endblock %}
