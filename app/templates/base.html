@@ -3,10 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#0f172a" id="meta-theme-color">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>{% block title %}MyCricScorer - Street & Weekend Cricket{% endblock %}</title>
+
+  <!-- Theme Preload (Anti-FOUC) -->
+  <script>
+    (function() {
+      try {
+        const savedTheme = localStorage.getItem('cricscorer_theme') || localStorage.getItem('theme') || 'dark';
+        if (savedTheme === 'light') {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.add('light');
+          const meta = document.getElementById('meta-theme-color');
+          if (meta) meta.setAttribute('content', '#f8fafc');
+        } else {
+          document.documentElement.classList.remove('light');
+          document.documentElement.classList.add('dark');
+          const meta = document.getElementById('meta-theme-color');
+          if (meta) meta.setAttribute('content', '#0f172a');
+        }
+      } catch (e) {}
+    })();
+  </script>
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/static/manifest.json">

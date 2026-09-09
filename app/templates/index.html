@@ -16,9 +16,25 @@
         <p class="text-sm text-slate-400 mt-1 max-w-md">Fast 1-thumb scoring, instant undo, gully rule toggles, and WhatsApp scorecard export.</p>
       </div>
 
-      <button @click="openCreateModal = true" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/25 transition-all active:scale-95">
-        <span>+ Start New Match</span>
-      </button>
+      <div class="flex items-center gap-3">
+        <!-- Theme Toggle Button (Main/Home Page Exclusive) -->
+        <button type="button" @click="toggleTheme()"
+          class="inline-flex items-center gap-2 px-3.5 py-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-200 hover:text-white text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+          :title="theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+          <span x-show="theme === 'dark'" class="inline-flex items-center gap-1.5 text-amber-300">
+            <span>☀️</span>
+            <span>Light Mode</span>
+          </span>
+          <span x-show="theme === 'light'" class="inline-flex items-center gap-1.5 text-indigo-600">
+            <span>🌙</span>
+            <span>Dark Mode</span>
+          </span>
+        </button>
+
+        <button @click="openCreateModal = true" class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/25 transition-all active:scale-95 cursor-pointer">
+          <span>+ Start New Match</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -446,6 +462,27 @@ function matchDashboard() {
   ];
 
   return {
+    theme: localStorage.getItem('cricscorer_theme') || localStorage.getItem('theme') || 'dark',
+
+    toggleTheme() {
+      this.theme = this.theme === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem('cricscorer_theme', this.theme);
+        localStorage.setItem('theme', this.theme);
+      } catch (e) {}
+      if (this.theme === 'light') {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+        const meta = document.getElementById('meta-theme-color');
+        if (meta) meta.setAttribute('content', '#f8fafc');
+      } else {
+        document.documentElement.classList.remove('light');
+        document.documentElement.classList.add('dark');
+        const meta = document.getElementById('meta-theme-color');
+        if (meta) meta.setAttribute('content', '#0f172a');
+      }
+    },
+
     openCreateModal: false,
     loading: false,
     savedPlayers: registeredPlayers,

@@ -49,3 +49,272 @@ button {
 .live-pulse {
   animation: pulse-ring 2s infinite ease-in-out;
 }
+
+/* ==========================================================================
+   LIGHT MODE THEME OVERRIDES (Applied dynamically when html has class .light)
+   ========================================================================== */
+
+html.light,
+html.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Navigation Header */
+html.light header {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Background surfaces */
+html.light .bg-slate-950 {
+  background-color: #f8fafc !important;
+}
+
+html.light .bg-slate-900 {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-slate-900\/90,
+html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/70,
+html.light .bg-slate-900\/60,
+html.light .bg-slate-900\/50 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+html.light .bg-slate-950\/90,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/70,
+html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/50,
+html.light .bg-slate-950\/40 {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-slate-800 {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-slate-800\/80,
+html.light .bg-slate-800\/70,
+html.light .bg-slate-800\/60,
+html.light .bg-slate-800\/50,
+html.light .bg-slate-800\/40,
+html.light .bg-slate-800\/30 {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .bg-slate-700 {
+  background-color: #e2e8f0 !important;
+}
+
+/* Hover background states */
+html.light .hover\:bg-slate-800:hover {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .hover\:bg-slate-700:hover {
+  background-color: #cbd5e1 !important;
+}
+
+html.light .hover\:border-slate-700:hover,
+html.light .hover\:border-slate-600:hover {
+  border-color: #cbd5e1 !important;
+}
+
+/* Borders & Dividers */
+html.light .border-slate-800,
+html.light .border-slate-800\/80,
+html.light .border-slate-800\/60,
+html.light .border-slate-800\/50,
+html.light .border-slate-800\/40,
+html.light .border-slate-700,
+html.light .border-slate-900 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .divide-slate-800,
+html.light .divide-slate-800\/80,
+html.light .divide-slate-800\/60 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Text Colors */
+html.light .text-white {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-100 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.light .hover\:text-white:hover,
+html.light .hover\:text-slate-200:hover {
+  color: #0f172a !important;
+}
+
+/* Gradients */
+html.light .bg-gradient-to-r.from-emerald-950 {
+  background-image: linear-gradient(to right, #ecfdf5, #f0fdf4, #ffffff) !important;
+  border-color: #a7f3d0 !important;
+}
+
+html.light .bg-gradient-to-br.from-slate-900 {
+  background-image: linear-gradient(to bottom right, #ffffff, #f8fafc) !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Primary buttons with dark text */
+html.light .bg-emerald-500,
+html.light .bg-emerald-500 .text-slate-950,
+html.light a.bg-emerald-500,
+html.light button.bg-emerald-500 {
+  color: #020617 !important;
+}
+
+/* Accents & Status Badges in Light Mode */
+html.light .text-emerald-400 {
+  color: #059669 !important;
+}
+
+html.light .bg-emerald-500\/10 {
+  background-color: #ecfdf5 !important;
+}
+
+html.light .border-emerald-500\/20,
+html.light .border-emerald-500\/30,
+html.light .border-emerald-500\/40,
+html.light .border-emerald-800\/50,
+html.light .border-emerald-900\/40 {
+  border-color: #a7f3d0 !important;
+}
+
+html.light .bg-emerald-950,
+html.light .bg-emerald-950\/40,
+html.light .bg-emerald-950\/50,
+html.light .bg-emerald-950\/60,
+html.light .bg-emerald-900\/30 {
+  background-color: #ecfdf5 !important;
+}
+
+html.light .text-amber-400,
+html.light .text-amber-300 {
+  color: #d97706 !important;
+}
+
+html.light .bg-amber-500\/10,
+html.light .bg-amber-950\/40,
+html.light .bg-amber-950\/50 {
+  background-color: #fffbeb !important;
+}
+
+html.light .border-amber-500\/20,
+html.light .border-amber-500\/40,
+html.light .border-amber-800\/40,
+html.light .border-amber-900\/40 {
+  border-color: #fde68a !important;
+}
+
+html.light .text-purple-400,
+html.light .text-purple-300 {
+  color: #7c3aed !important;
+}
+
+html.light .bg-purple-500\/10,
+html.light .bg-purple-950\/40 {
+  background-color: #f5f3ff !important;
+}
+
+html.light .border-purple-500\/20,
+html.light .border-purple-800\/40 {
+  border-color: #ddd6fe !important;
+}
+
+html.light .text-red-400,
+html.light .text-red-300 {
+  color: #dc2626 !important;
+}
+
+html.light .bg-red-500\/10,
+html.light .bg-red-950\/40,
+html.light .bg-red-950\/50,
+html.light .bg-red-900\/60 {
+  background-color: #fef2f2 !important;
+}
+
+html.light .border-red-500\/20,
+html.light .border-red-800\/40 {
+  border-color: #fecaca !important;
+}
+
+html.light .text-blue-400 {
+  color: #2563eb !important;
+}
+
+html.light .bg-blue-500\/10,
+html.light .bg-blue-950\/40 {
+  background-color: #eff6ff !important;
+}
+
+html.light .border-blue-500\/20,
+html.light .border-blue-800\/40 {
+  border-color: #bfdbfe !important;
+}
+
+/* Forms & Inputs */
+html.light input,
+html.light select,
+html.light textarea {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Modal Backdrops */
+html.light .fixed.inset-0.bg-slate-950\/80,
+html.light .fixed.inset-0.bg-slate-950\/90,
+html.light .fixed.inset-0.bg-black\/60,
+html.light .fixed.inset-0.bg-black\/50 {
+  background-color: rgba(15, 23, 42, 0.6) !important;
+}
+
+/* Light Mode Scrollbars */
+html.light ::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.9);
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(203, 213, 225, 0.9);
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.8);
+}
+
