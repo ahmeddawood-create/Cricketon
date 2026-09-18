@@ -28,7 +28,7 @@ def test_view_routes(client):
     # Test dashboard route
     res = client.get("/")
     assert res.status_code == 200
-    assert "MyCric" in res.text
+    assert "Cricketon" in res.text
 
     # Test players directory route
     res = client.get("/players")

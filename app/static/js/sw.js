@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cricscorer-v1';
+const CACHE_NAME = 'cricketon-v1';
 const ASSETS_TO_CACHE = [
   '/',
   '/players',

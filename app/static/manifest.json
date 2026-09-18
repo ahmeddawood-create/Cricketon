@@ -1,6 +1,6 @@
 {
-  "name": "MyCricScorer",
-  "short_name": "CricScorer",
+  "name": "Cricketon",
+  "short_name": "Cricketon",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#020617",

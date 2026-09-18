@@ -1,4 +1,4 @@
-# 🏏 MyCricScorer
+# 🏏 Cricketon
 
 > **Mobile-First Gully & Weekend Cricket Scoring Web App**  
 > Fast 1-thumb scoring, instant atomic undo, gully rule toggles, live spectator scoreboard, and WhatsApp-ready scorecard export. Built with Python (FastAPI), SQLModel, SQLite, Tailwind CSS, Alpine.js, and PWA capabilities.
